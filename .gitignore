@@ -1,0 +1,101 @@
+# Main project .gitignore
+
+# AI/LLM Assistant Files
+.claude/
+.grok/
+.cursor/
+.codeium/
+.tabnine/
+.copilot/
+.codex/
+.openai/
+.anthropic/
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+.npm
+.yarn/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+build/
+out/
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output
+
+# Cache directories
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.eslintcache
+
+# Temporary folders
+tmp/
+temp/
+.tmp/
+
+# OS generated files
+*.tmp
+*.temp
+
+# Docker
+.dockerignore
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files (unless needed)
+*.zip
+*.tar.gz
+*.rar
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Personal notes and drafts
+notes.md
+draft.md
+scratchpad.md
