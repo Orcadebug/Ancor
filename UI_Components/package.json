@@ -1,9 +1,9 @@
 {
-  "name": "react-ui-component-library",
+  "name": "ai-infrastructure-platform-frontend",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "A React UI component library built with shadcn/ui and Tailwind CSS",
+  "description": "Frontend for AI Infrastructure Management Platform - React + TypeScript + shadcn/ui",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -1,81 +1,133 @@
-# React UI Component Library
+# AI Infrastructure Platform - Frontend
 
-A comprehensive React UI component library built with [shadcn/ui](https://ui.shadcn.com/) and [Tailwind CSS](https://tailwindcss.com/).
+React + TypeScript frontend for the AI Infrastructure Management Platform, built with shadcn/ui components and Tailwind CSS.
 
-## Features
+## 🚀 Deploy to Vercel
 
-- 🎨 **Modern Design**: Clean, accessible components following modern design principles
-- 🔧 **TypeScript**: Full TypeScript support for better development experience
-- 🎯 **Tailwind CSS**: Utility-first CSS framework for rapid UI development
-- ♿ **Accessible**: Built with accessibility in mind using Radix UI primitives
-- 🚀 **Fast**: Powered by Vite for lightning-fast development and builds
+### Quick Deploy
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FOrcadebug%2FAncor%2Ftree%2Fmain%2FUI_Components)
 
-## Components Included
+### Manual Deployment
 
-- **Buttons**: Various button styles and sizes
-- **Cards**: Flexible card components with headers and content
-- **Forms**: Input fields, labels, and form controls
-- **Navigation**: Tabs, menus, and navigation components
-- **Feedback**: Alerts, toasts, and loading states
-- **Data Display**: Tables, badges, and typography
-- **Layout**: Grids, containers, and spacing utilities
+1. **Fork/Clone the repository**
+2. **Go to [Vercel](https://vercel.com)**
+3. **Import your repository**
+4. **Configure the project**:
+   - **Framework Preset**: Vite
+   - **Root Directory**: `UI_Components`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
 
-## Getting Started
+5. **Add Environment Variables** in Vercel dashboard:
+   ```
+   VITE_API_BASE_URL=https://your-backend-app.railway.app/api/v1
+   VITE_APP_NAME=AI Infrastructure Platform
+   VITE_APP_VERSION=1.0.0
+   ```
 
-### Prerequisites
+6. **Deploy!**
 
-- Node.js (v16 or higher)
-- npm or yarn
+## 🛠️ Local Development
 
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd react-ui-component-library
-```
-
-2. Install dependencies:
-```bash
+# Install dependencies
 npm install
-```
 
-3. Start the development server:
-```bash
+# Start development server
 npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
 ```
 
-4. Open your browser and visit `http://localhost:5173` to see the component showcase.
+## 🔧 Configuration
 
-## Development
+### Environment Variables
 
-### Available Scripts
+Create `.env` file in the root directory:
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+```bash
+# Copy from example
+cp .env.example .env
 
-### Project Structure
-
-```
-src/
-├── components/
-│   ├── ui/           # Core UI components
-│   └── ...
-├── hooks/            # Custom React hooks
-├── lib/              # Utility functions
-├── pages/            # Demo pages
-└── ...
+# Edit with your backend URL
+VITE_API_BASE_URL=http://localhost:3000/api/v1
 ```
 
-## Customization
+### Backend Integration
 
-The components are built with Tailwind CSS and can be easily customized by:
+The frontend is configured to work with the backend API. Update `VITE_API_BASE_URL` to point to your backend deployment:
 
-1. Modifying the `tailwind.config.ts` file
-2. Updating CSS custom properties in `src/index.css`
-3. Customizing component variants in individual component files
+- **Local**: `http://localhost:3000/api/v1`
+- **Production**: `https://your-backend.railway.app/api/v1`
+
+## 📦 Features
+
+### UI Components (30+)
+- **Navigation**: Menus, breadcrumbs, pagination
+- **Forms**: Inputs, selects, checkboxes, radio buttons
+- **Feedback**: Alerts, toasts, progress indicators
+- **Layout**: Cards, tabs, accordions, sheets
+- **Data Display**: Tables, badges, avatars
+
+### Pages
+- **Component Demo**: Showcase of all UI components
+- **Ready for Integration**: API client configured for backend
+
+### Styling
+- **Tailwind CSS**: Utility-first styling
+- **shadcn/ui**: Consistent design system
+- **Dark/Light Mode**: Built-in theme support
+- **Responsive**: Mobile-first design
+
+## 🔗 API Integration
+
+The frontend includes a pre-configured API client (`src/lib/api.ts`) with methods for:
+
+- **Authentication**: Login, register, profile management
+- **Deployments**: Create, manage AI model deployments
+- **Monitoring**: Real-time metrics and analytics
+- **Management**: Instance control and logs
+
+## 📁 Project Structure
+
+```
+UI_Components/
+├── src/
+│   ├── components/ui/     # shadcn/ui components (30+)
+│   ├── pages/             # Application pages
+│   ├── lib/               # Utilities and API client
+│   └── hooks/             # Custom React hooks
+├── public/                # Static assets
+├── vercel.json           # Vercel configuration
+└── package.json          # Dependencies and scripts
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**Build fails on Vercel:**
+- Ensure `Root Directory` is set to `UI_Components`
+- Check that all environment variables are set
+
+**API calls fail:**
+- Verify `VITE_API_BASE_URL` points to your backend
+- Check CORS settings in backend allow your Vercel domain
+
+**Components not rendering:**
+- Clear browser cache
+- Check console for JavaScript errors
+
+### Support
+
+For issues with deployment or development, check:
+1. Vercel build logs
+2. Browser console errors
+3. Network tab for API call failures
 
 ## Technologies Used
 
@@ -87,6 +139,6 @@ The components are built with Tailwind CSS and can be easily customized by:
 - [Radix UI](https://www.radix-ui.com/) - Accessible primitives
 - [Lucide React](https://lucide.dev/) - Icons
 
-## License
+## 📄 License
 
-This project is open source and available under the [MIT License](LICENSE).
+MIT License - see the root project for details.

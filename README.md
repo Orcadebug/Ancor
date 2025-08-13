@@ -218,14 +218,28 @@ npm run lint
 
 ## 🚀 Deployment
 
-### Backend (Railway)
+### Frontend (Vercel) ⚡
+
+**Quick Deploy:**
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FOrcadebug%2FAncor%2Ftree%2Fmain%2FUI_Components)
+
+**Manual Setup:**
+1. Go to [Vercel](https://vercel.com) and import your repository
+2. **Configure project settings**:
+   - **Framework Preset**: Vite
+   - **Root Directory**: `UI_Components`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+3. **Add environment variables**:
+   ```
+   VITE_API_BASE_URL=https://your-backend.railway.app/api/v1
+   VITE_APP_NAME=AI Infrastructure Platform
+   ```
+4. Deploy!
+
+### Backend (Railway) 🚂
 1. Connect GitHub repository to Railway
 2. Set environment variables in Railway dashboard
-3. Deploy automatically on push to main
-
-### Frontend (Vercel)
-1. Connect GitHub repository to Vercel
-2. Configure build settings for React
 3. Deploy automatically on push to main
 
 ### Database (Supabase)
