@@ -5,7 +5,7 @@
       "src": "Frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "installCommand": "cd Frontend && npm install",
+        "installCommand": "cd Frontend && pnpm install --no-frozen-lockfile",
         "buildCommand": "cd Frontend && npm run build:vercel",
         "outputDirectory": "Frontend/dist/spa"
       }
