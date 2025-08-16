@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "Frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "installCommand": "cd Frontend && pnpm install --no-frozen-lockfile",
+        "buildCommand": "cd Frontend && pnpm run build:vercel",
+        "outputDirectory": "Frontend/dist/spa"
+      }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
