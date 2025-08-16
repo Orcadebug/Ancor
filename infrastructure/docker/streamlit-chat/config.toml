@@ -1,0 +1,51 @@
+[global]
+# Streamlit configuration for AI Platform Chat UI
+
+[server]
+# Server settings
+port = 8501
+enableCORS = false
+enableXsrfProtection = true
+maxUploadSize = 200
+maxMessageSize = 200
+enableWebsocketCompression = false
+allowRunOnSave = true
+runOnSave = false
+
+[browser]
+# Browser settings
+gatherUsageStats = false
+showErrorDetails = false
+
+[client]
+# Client settings
+caching = true
+displayEnabled = true
+showErrorDetails = false
+
+[runner]
+# Runner settings
+magicEnabled = true
+installTracer = false
+fixMatplotlib = true
+postScriptGC = true
+fastReruns = true
+enforceSerializableSessionState = true
+
+[logger]
+# Logging settings
+level = "info"
+messageFormat = "%(asctime)s.%(msecs)03d %(name)s: %(levelname)s: %(message)s"
+
+[theme]
+# Theme settings
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+textColor = "#262730"
+font = "sans serif"
+
+[deprecation]
+# Deprecation warnings
+showfileUploaderEncoding = false
+showImageFormat = false

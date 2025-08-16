@@ -1,0 +1,43 @@
+{
+  "name": "ai-infrastructure-platform",
+  "version": "1.0.0",
+  "description": "AI Infrastructure Management Platform - One-click deployment for private AI systems",
+  "private": true,
+  "workspaces": [
+    "InfraView",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd InfraView && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "npm run build:frontend && npm run build:backend",
+    "build:frontend": "cd InfraView && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "start": "cd backend && npm start",
+    "deploy": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "cd InfraView && npm run check",
+    "test:backend": "cd backend && npm run type-check",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd InfraView && echo 'Frontend linting not configured'",
+    "lint:backend": "cd backend && npm run lint",
+    "setup": "npm install && npm run setup:frontend && npm run setup:backend",
+    "setup:frontend": "cd InfraView && npm install",
+    "setup:backend": "cd backend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "ai",
+    "infrastructure",
+    "llama",
+    "rag",
+    "document-processing",
+    "cloud-automation",
+    "terraform"
+  ],
+  "author": "AI Infrastructure Platform Team",
+  "license": "MIT"
+}

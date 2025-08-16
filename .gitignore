@@ -1,0 +1,203 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.vercel/
+.nuxt/
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output/
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AI Assistant directories
+.claude/
+.grok/
+.cursor/
+.codeium/
+.copilot/
+.assistant/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+.dockerignore
+Dockerfile.dev
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Cloud provider credentials
+gcp-credentials.json
+aws-credentials.json
+coreweave-credentials.json
+
+# Database dumps
+*.sql.gz
+*.dump
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Test files
+test-results/
+coverage/
+
+# Documentation (keeping only deployment docs)
+README.md
+docs/
+*.md
+!DEPLOYMENT.md
+
+# Scripts (keeping only deploy script)
+scripts/
+!scripts/deploy.sh
+
+# Config files that shouldn't be committed
+.npmrc
+.yarnrc
+.nvmrc
+
+# Lock files (optional - uncomment if you want to ignore them)
+# package-lock.json
+# yarn.lock
+
+# Local development files
+.local/
+local/
+
+# Sentry
+.sentryclirc
+
+# Certificates
+*.pem
+*.key
+*.crt
+*.cert
+
+# API keys and secrets
+secrets/
+credentials/
+keys/
+
+# Monitoring and analytics
+.analytics/
+.monitoring/
+
+# Deployment artifacts
+deploy/
+deployment/
+!DEPLOYMENT.md
