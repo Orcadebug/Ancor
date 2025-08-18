@@ -1,232 +1,363 @@
-import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import Joi from 'joi';
-import { query, transaction } from '../config/database';
-import { asyncHandler, createError } from '../middleware/errorHandler';
-import { strictRateLimiter } from '../middleware/rateLimiter';
-import { authenticate, AuthenticatedRequest } from '../middleware/auth';
-import { logger } from '../utils/logger';
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import { prisma } from '@/config/database.js';
+import { logger } from '@/utils/logger.js';
+import { hashPassword, verifyPassword, generateTokenPair, verifyRefreshToken } from '@/utils/auth.js';
+import { authenticate } from '@/middleware/auth.js';
+import { AuthenticatedRequest, ApiResponse } from '@/types/index.js';
 
-const router = express.Router();
+const router = Router();
 
 // Validation schemas
-const registerSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().min(8).required(),
-  firstName: Joi.string().min(1).max(100).required(),
-  lastName: Joi.string().min(1).max(100).required(),
-  companyName: Joi.string().max(255).optional()
+const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).max(100),
+  name: z.string().min(1).max(100),
+  organizationName: z.string().min(1).max(100),
+  industry: z.enum(['LEGAL', 'HEALTHCARE', 'FINANCE', 'PROFESSIONAL']),
+  teamSize: z.enum(['SMALL', 'MEDIUM', 'LARGE', 'ENTERPRISE']),
+  documentVolume: z.enum(['LOW', 'MEDIUM', 'HIGH', 'ENTERPRISE'])
 });
 
-const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
-  password: Joi.string().required()
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1)
 });
 
-// Register new user
-router.post('/register', strictRateLimiter, asyncHandler(async (req, res) => {
-  const { error, value } = registerSchema.validate(req.body);
-  if (error) {
-    throw createError(error.details[0].message, 400);
-  }
+const refreshSchema = z.object({
+  refreshToken: z.string()
+});
 
-  const { email, password, firstName, lastName, companyName } = value;
+/**
+ * Register new user and organization
+ */
+router.post('/register', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const validatedData = registerSchema.parse(req.body);
 
-  // Check if user already exists
-  const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
-  if (existingUser.rows.length > 0) {
-    throw createError('User already exists with this email', 409);
-  }
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: validatedData.email }
+    });
 
-  // Hash password
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  // Create user and organization in transaction
-  const result = await transaction(async (txQuery) => {
-    // Create user
-    const userResult = await txQuery(`
-      INSERT INTO users (email, password_hash, first_name, last_name, company_name)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, email, first_name, last_name, company_name, created_at
-    `, [email, passwordHash, firstName, lastName, companyName]);
-
-    const user = userResult.rows[0];
-
-    // Create default organization if company name provided
-    if (companyName) {
-      const orgResult = await txQuery(`
-        INSERT INTO organizations (name, owner_id, billing_email)
-        VALUES ($1, $2, $3)
-        RETURNING id
-      `, [companyName, user.id, email]);
-
-      const organizationId = orgResult.rows[0].id;
-
-      // Add user as organization owner
-      await txQuery(`
-        INSERT INTO organization_members (organization_id, user_id, role)
-        VALUES ($1, $2, 'owner')
-      `, [organizationId, user.id]);
-
-      user.organizationId = organizationId;
+    if (existingUser) {
+      res.status(409).json({
+        success: false,
+        error: 'User with this email already exists',
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
 
-    return user;
-  });
+    // Hash password
+    const passwordHash = await hashPassword(validatedData.password);
 
-  logger.info('User registered', { userId: result.id, email: result.email });
+    // Create organization and user in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create organization
+      const organization = await tx.organization.create({
+        data: {
+          name: validatedData.organizationName,
+          industry: validatedData.industry,
+          teamSize: validatedData.teamSize,
+          documentVolume: validatedData.documentVolume
+        }
+      });
 
-  res.status(201).json({
-    message: 'User registered successfully',
-    user: {
-      id: result.id,
-      email: result.email,
-      firstName: result.first_name,
-      lastName: result.last_name,
-      companyName: result.company_name,
-      organizationId: result.organizationId
+      // Create user as admin of the organization
+      const user = await tx.user.create({
+        data: {
+          email: validatedData.email,
+          name: validatedData.name,
+          passwordHash,
+          organizationId: organization.id,
+          role: 'ADMIN'
+        }
+      });
+
+      return { user, organization };
+    });
+
+    // Generate tokens
+    const tokens = generateTokenPair(result.user as any);
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+          role: result.user.role,
+          organizationId: result.user.organizationId
+        },
+        organization: result.organization,
+        tokens
+      },
+      message: 'Registration successful',
+      timestamp: new Date().toISOString()
+    };
+
+    logger.info(`New user registered: ${result.user.email}`);
+    res.status(201).json(response);
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors,
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
-  });
-}));
 
-// Login user
-router.post('/login', strictRateLimiter, asyncHandler(async (req, res) => {
-  const { error, value } = loginSchema.validate(req.body);
-  if (error) {
-    throw createError(error.details[0].message, 400);
+    logger.error('Registration failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Registration failed',
+      timestamp: new Date().toISOString()
+    });
   }
+});
 
-  const { email, password } = value;
+/**
+ * Login user
+ */
+router.post('/login', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const validatedData = loginSchema.parse(req.body);
 
-  // Get user with password
-  const userResult = await query(`
-    SELECT u.id, u.email, u.password_hash, u.first_name, u.last_name, u.role, u.email_verified,
-           o.id as organization_id, o.name as organization_name
-    FROM users u
-    LEFT JOIN organization_members om ON om.user_id = u.id AND om.role = 'owner'
-    LEFT JOIN organizations o ON o.id = om.organization_id
-    WHERE u.email = $1
-  `, [email]);
+    // Find user with organization
+    const user = await prisma.user.findUnique({
+      where: { email: validatedData.email },
+      include: { organization: true }
+    });
 
-  if (userResult.rows.length === 0) {
-    throw createError('Invalid email or password', 401);
-  }
-
-  const user = userResult.rows[0];
-
-  // Check password
-  const isValidPassword = await bcrypt.compare(password, user.password_hash);
-  if (!isValidPassword) {
-    throw createError('Invalid email or password', 401);
-  }
-
-  if (!user.email_verified) {
-    throw createError('Please verify your email before logging in', 401);
-  }
-
-  // Generate JWT
-  const token = jwt.sign(
-    { userId: user.id, email: user.email },
-    process.env.JWT_SECRET!,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-  );
-
-  logger.info('User logged in', { userId: user.id, email: user.email });
-
-  res.json({
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.role,
-      organizationId: user.organization_id,
-      organizationName: user.organization_name
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
-  });
-}));
 
-// Get current user
-router.get('/me', authenticate, asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const userResult = await query(`
-    SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.company_name,
-           o.id as organization_id, o.name as organization_name
-    FROM users u
-    LEFT JOIN organization_members om ON om.user_id = u.id AND om.role = 'owner'
-    LEFT JOIN organizations o ON o.id = om.organization_id
-    WHERE u.id = $1
-  `, [req.user!.id]);
-
-  const user = userResult.rows[0];
-
-  res.json({
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.role,
-      companyName: user.company_name,
-      organizationId: user.organization_id,
-      organizationName: user.organization_name
+    // Verify password
+    const isValidPassword = await verifyPassword(validatedData.password, user.passwordHash);
+    if (!isValidPassword) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
-  });
-}));
 
-// Update user profile
-router.put('/profile', authenticate, asyncHandler(async (req: AuthenticatedRequest, res) => {
-  const updateSchema = Joi.object({
-    firstName: Joi.string().min(1).max(100).optional(),
-    lastName: Joi.string().min(1).max(100).optional(),
-    companyName: Joi.string().max(255).optional()
-  });
+    // Check if user and organization are active
+    if (!user.isActive || !user.organization.isActive) {
+      res.status(401).json({
+        success: false,
+        error: 'Account is inactive',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
 
-  const { error, value } = updateSchema.validate(req.body);
-  if (error) {
-    throw createError(error.details[0].message, 400);
+    // Generate tokens
+    const tokens = generateTokenPair(user as any);
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          organizationId: user.organizationId
+        },
+        organization: user.organization,
+        tokens
+      },
+      message: 'Login successful',
+      timestamp: new Date().toISOString()
+    };
+
+    logger.info(`User logged in: ${user.email}`);
+    res.json(response);
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    logger.error('Login failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Login failed',
+      timestamp: new Date().toISOString()
+    });
   }
+});
 
-  const updateFields = [];
-  const updateValues = [];
-  let paramCounter = 1;
+/**
+ * Refresh access token
+ */
+router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const validatedData = refreshSchema.parse(req.body);
 
-  Object.entries(value).forEach(([key, val]) => {
-    if (val !== undefined) {
-      updateFields.push(`${key.replace(/([A-Z])/g, '_$1').toLowerCase()} = $${paramCounter}`);
-      updateValues.push(val);
-      paramCounter++;
+    // Verify refresh token
+    const payload = verifyRefreshToken(validatedData.refreshToken);
+
+    // Get user to ensure they still exist and are active
+    const user = await prisma.user.findUnique({
+      where: { 
+        id: payload.userId,
+        isActive: true 
+      },
+      include: { organization: true }
+    });
+
+    if (!user || !user.organization.isActive) {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid refresh token',
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
-  });
 
-  if (updateFields.length === 0) {
-    throw createError('No fields to update', 400);
+    // Generate new tokens
+    const tokens = generateTokenPair(user as any);
+
+    const response: ApiResponse = {
+      success: true,
+      data: { tokens },
+      message: 'Token refreshed successfully',
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(response);
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: error.errors,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    logger.error('Token refresh failed:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Invalid refresh token',
+      timestamp: new Date().toISOString()
+    });
   }
+});
 
-  updateValues.push(req.user!.id);
+/**
+ * Get current user profile
+ */
+router.get('/profile', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      include: { 
+        organization: true,
+        _count: {
+          select: {
+            auditLogs: true,
+            chatSessions: true
+          }
+        }
+      }
+    });
 
-  const result = await query(`
-    UPDATE users 
-    SET ${updateFields.join(', ')}, updated_at = NOW()
-    WHERE id = $${paramCounter}
-    RETURNING id, email, first_name, last_name, company_name
-  `, updateValues);
-
-  const user = result.rows[0];
-
-  logger.info('User profile updated', { userId: req.user!.id });
-
-  res.json({
-    message: 'Profile updated successfully',
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      companyName: user.company_name
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        error: 'User not found',
+        timestamp: new Date().toISOString()
+      });
+      return;
     }
-  });
-}));
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organizationId: user.organizationId,
+        organization: user.organization,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        stats: {
+          auditLogs: user._count.auditLogs,
+          chatSessions: user._count.chatSessions
+        }
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    res.json(response);
+
+  } catch (error) {
+    logger.error('Failed to get user profile:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user profile',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
+ * Logout user (optional endpoint for audit logging)
+ */
+router.post('/logout', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    // Log the logout event
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        action: 'logout',
+        resourceType: 'auth',
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    const response: ApiResponse = {
+      success: true,
+      message: 'Logout successful',
+      timestamp: new Date().toISOString()
+    };
+
+    logger.info(`User logged out: ${req.user!.email}`);
+    res.json(response);
+
+  } catch (error) {
+    logger.error('Logout failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Logout failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 export default router;

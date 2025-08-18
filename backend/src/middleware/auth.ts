@@ -1,107 +1,178 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import { query } from '../config/database';
-import { createError } from './errorHandler';
+import { prisma } from '@/config/database.js';
+import { extractTokenFromHeader, verifyAccessToken, hasPermission } from '@/utils/auth.js';
+import { AuthenticatedRequest } from '@/types/index.js';
+import { logger } from '@/utils/logger.js';
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-    organizationId?: string;
+/**
+ * Middleware to authenticate requests using JWT tokens
+ */
+export async function authenticate(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const token = extractTokenFromHeader(req.headers.authorization);
+    
+    if (!token) {
+      res.status(401).json({
+        success: false,
+        error: 'Access token required',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    // Verify and decode token
+    const payload = verifyAccessToken(token);
+    
+    // Fetch user from database to ensure they still exist and are active
+    const user = await prisma.user.findUnique({
+      where: { 
+        id: payload.userId,
+        isActive: true 
+      },
+      include: {
+        organization: true
+      }
+    });
+
+    if (!user) {
+      res.status(401).json({
+        success: false,
+        error: 'User not found or inactive',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    // Check if organization is active
+    if (!user.organization.isActive) {
+      res.status(401).json({
+        success: false,
+        error: 'Organization is inactive',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    // Attach user to request object
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      organizationId: user.organizationId,
+      role: user.role,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    };
+
+    // Update last login time
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    });
+
+    next();
+  } catch (error) {
+    logger.error('Authentication error:', error);
+    res.status(401).json({
+      success: false,
+      error: 'Invalid or expired token',
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+/**
+ * Middleware to check if user has required role
+ */
+export function requireRole(requiredRole: string) {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (!hasPermission(req.user.role, requiredRole)) {
+      res.status(403).json({
+        success: false,
+        error: `Insufficient permissions. Required: ${requiredRole}`,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    next();
   };
 }
 
-export const authenticate = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    const authHeader = req.header('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      throw createError('Access token required', 401);
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
-    
-    // Get user from database
-    const userResult = await query(
-      'SELECT id, email, role FROM users WHERE id = $1 AND email_verified = true',
-      [decoded.userId]
-    );
-
-    if (userResult.rows.length === 0) {
-      throw createError('Invalid or expired token', 401);
-    }
-
-    req.user = {
-      id: userResult.rows[0].id,
-      email: userResult.rows[0].email,
-      role: userResult.rows[0].role
-    };
-
-    next();
-  } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(createError('Invalid token', 401));
-    } else {
-      next(error);
-    }
+/**
+ * Middleware to check if user belongs to the organization
+ */
+export function requireOrganization(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  const organizationId = req.params.organizationId || req.body.organizationId;
+  
+  if (!req.user) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication required',
+      timestamp: new Date().toISOString()
+    });
+    return;
   }
-};
 
-export const requireRole = (roles: string[]) => {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      next(createError('Authentication required', 401));
-      return;
+  if (organizationId && req.user.organizationId !== organizationId) {
+    res.status(403).json({
+      success: false,
+      error: 'Access denied to this organization',
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Middleware to log user actions for audit purposes
+ */
+export function auditLog(action: string, resourceType: string) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (req.user) {
+        const resourceId = req.params.id || req.body.id || null;
+        
+        await prisma.auditLog.create({
+          data: {
+            userId: req.user.id,
+            action,
+            resourceType,
+            resourceId,
+            details: {
+              path: req.path,
+              method: req.method,
+              body: req.body,
+              params: req.params,
+              query: req.query
+            },
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          }
+        });
+      }
+      
+      next();
+    } catch (error) {
+      logger.error('Audit log error:', error);
+      // Don't fail the request if audit logging fails
+      next();
     }
-
-    if (!roles.includes(req.user.role)) {
-      next(createError('Insufficient permissions', 403));
-      return;
-    }
-
-    next();
   };
-};
-
-export const requireOrganizationAccess = async (
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    if (!req.user) {
-      throw createError('Authentication required', 401);
-    }
-
-    const organizationId = req.params.organizationId || req.body.organizationId;
-    
-    if (!organizationId) {
-      throw createError('Organization ID required', 400);
-    }
-
-    // Check if user has access to this organization
-    const accessResult = await query(`
-      SELECT om.role, o.name 
-      FROM organization_members om
-      JOIN organizations o ON o.id = om.organization_id
-      WHERE om.organization_id = $1 AND om.user_id = $2
-    `, [organizationId, req.user.id]);
-
-    if (accessResult.rows.length === 0) {
-      throw createError('Access denied to this organization', 403);
-    }
-
-    req.user.organizationId = organizationId;
-    req.user.role = accessResult.rows[0].role; // Override with org role
-
-    next();
-  } catch (error) {
-    next(error);
-  }
-};
+}

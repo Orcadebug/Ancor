@@ -1,12 +1,11 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
   "framework": "vite",
+  "env": {
+    "VITE_USE_MOCK_DATA": "true"
+  },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://your-backend-url.com/api/$1"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
