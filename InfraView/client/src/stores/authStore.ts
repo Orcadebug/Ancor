@@ -34,8 +34,17 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: null,
-      isAuthenticated: false,
+      // Mock user for testing - bypass login
+      user: {
+        id: "user-1",
+        email: "admin@example.com",
+        firstName: "Admin",
+        lastName: "User",
+        role: "admin",
+        organizationId: "org-1",
+        organizationName: "Test Organization"
+      },
+      isAuthenticated: true,
       isLoading: false,
 
       login: async (email: string, password: string) => {
