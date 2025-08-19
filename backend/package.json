@@ -2,12 +2,12 @@
   "name": "ancor-backend",
   "version": "1.0.0",
   "description": "AI Infrastructure Management Platform Backend",
-  "main": "dist/server.js",
+  "main": "dist/simple-server.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch src/simple-server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/simple-server.js",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.js"
