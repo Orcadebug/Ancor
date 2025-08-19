@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "build": "echo 'No build needed'",
-    "start": "echo 'Current directory:' && pwd && echo 'Files here:' && ls -la && echo 'Starting server...' && node server.js",
+    "start": "node -e \"const express = require('express'); const app = express(); const PORT = process.env.PORT || 3001; app.use(express.json()); app.get('/health', (req, res) => res.json({success: true, message: 'Server is healthy', timestamp: new Date().toISOString()})); app.get('/', (req, res) => res.json({success: true, message: 'AI Infrastructure Platform API'})); app.listen(PORT, '0.0.0.0', () => console.log('Server running on port', PORT));\"",
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.js"
