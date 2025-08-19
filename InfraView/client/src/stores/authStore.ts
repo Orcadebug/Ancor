@@ -1,71 +1,78 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { api } from '@/lib/api';
-
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  organizationId?: string;
-  organizationName?: string;
-}
+import { supabase, type User } from '@/lib/supabase';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 interface AuthState {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   
   // Actions
-  login: (email: string, password: string) => Promise<void>;
-  register: (userData: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    companyName?: string;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signUp: (email: string, password: string, userData: {
+    username: string;
+    organizationName?: string;
   }) => Promise<void>;
-  logout: () => void;
-  fetchCurrentUser: () => Promise<void>;
-  updateUser: (userData: Partial<User>) => void;
+  signOut: () => Promise<void>;
+  initialize: () => Promise<void>;
+  updateProfile: (userData: Partial<User>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // Mock user for testing - bypass login
-      user: {
-        id: "user-1",
-        email: "admin@example.com",
-        firstName: "Admin",
-        lastName: "User",
-        role: "admin",
-        organizationId: "org-1",
-        organizationName: "Test Organization"
-      },
-      isAuthenticated: true,
-      isLoading: false,
+      user: null,
+      session: null,
+      isAuthenticated: false,
+      isLoading: true,
 
-      login: async (email: string, password: string) => {
+      signInWithEmail: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
-          const response = await api.login(email, password);
-          set({ 
-            user: response.user, 
-            isAuthenticated: true, 
-            isLoading: false 
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
           });
+          
+          if (error) throw error;
+          
+          // Fetch user profile from public.users table
+          if (data.user) {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', data.user.id)
+              .single();
+            
+            set({ 
+              user: profile, 
+              session: data.session,
+              isAuthenticated: true,
+              isLoading: false 
+            });
+          }
         } catch (error) {
           set({ isLoading: false });
           throw error;
         }
       },
 
-      register: async (userData) => {
+      signInWithGoogle: async () => {
         set({ isLoading: true });
         try {
-          await api.register(userData);
+          const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: `${window.location.origin}/auth/callback`
+            }
+          });
+          
+          if (error) throw error;
+          
+          // The actual user setting will happen in the auth callback
           set({ isLoading: false });
         } catch (error) {
           set({ isLoading: false });
@@ -73,41 +80,128 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        api.logout();
+      signUp: async (email: string, password: string, userData: {
+        username: string;
+        organizationName?: string;
+      }) => {
+        set({ isLoading: true });
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                username: userData.username,
+                organization_name: userData.organizationName
+              }
+            }
+          });
+          
+          if (error) throw error;
+          
+          set({ isLoading: false });
+          
+          // User profile will be created automatically by the database trigger
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      signOut: async () => {
+        await supabase.auth.signOut();
         set({ 
           user: null, 
+          session: null,
           isAuthenticated: false 
         });
       },
 
-      fetchCurrentUser: async () => {
+      initialize: async () => {
+        set({ isLoading: true });
+        
         try {
-          const response = await api.getCurrentUser();
-          set({ 
-            user: response.user, 
-            isAuthenticated: true 
+          // Get initial session
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session?.user) {
+            // Fetch user profile
+            const { data: profile } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            set({ 
+              user: profile, 
+              session,
+              isAuthenticated: true,
+              isLoading: false 
+            });
+          } else {
+            set({ 
+              user: null, 
+              session: null,
+              isAuthenticated: false,
+              isLoading: false 
+            });
+          }
+
+          // Listen for auth changes
+          supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+              // Fetch user profile
+              const { data: profile } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+              
+              set({ 
+                user: profile, 
+                session,
+                isAuthenticated: true,
+                isLoading: false 
+              });
+            } else if (event === 'SIGNED_OUT') {
+              set({ 
+                user: null, 
+                session: null,
+                isAuthenticated: false,
+                isLoading: false 
+              });
+            }
           });
         } catch (error) {
+          console.error('Auth initialization error:', error);
           set({ 
             user: null, 
-            isAuthenticated: false 
+            session: null,
+            isAuthenticated: false,
+            isLoading: false 
           });
-          throw error;
         }
       },
 
-      updateUser: (userData: Partial<User>) => {
+      updateProfile: async (userData: Partial<User>) => {
         const currentUser = get().user;
-        if (currentUser) {
-          set({ user: { ...currentUser, ...userData } });
-        }
+        if (!currentUser) throw new Error('No user logged in');
+
+        const { error } = await supabase
+          .from('users')
+          .update(userData)
+          .eq('id', currentUser.id);
+
+        if (error) throw error;
+
+        set({ user: { ...currentUser, ...userData } });
       },
     }),
     {
       name: 'auth-storage',
       partialize: (state) => ({ 
         user: state.user, 
+        session: state.session,
         isAuthenticated: state.isAuthenticated 
       }),
     }

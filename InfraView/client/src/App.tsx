@@ -13,15 +13,19 @@ import SystemMonitor from "@/pages/system-monitor";
 import UserManagement from "@/pages/user-management";
 import Billing from "@/pages/billing";
 import Settings from "@/pages/settings";
+import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import AuthCallback from "@/pages/auth-callback";
 
 function Router() {
   return (
     <Switch>
       {/* Public routes */}
+      <Route path="/landing" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/auth/callback" component={AuthCallback} />
       
       {/* Protected routes */}
       <Route path="/">
