@@ -22,13 +22,14 @@ function Router() {
   return (
     <Switch>
       {/* Public routes */}
+      <Route path="/" component={Landing} />
       <Route path="/landing" component={Landing} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/auth/callback" component={AuthCallback} />
       
       {/* Protected routes */}
-      <Route path="/">
+      <Route path="/dashboard">
         <ProtectedRoute>
           <Dashboard />
         </ProtectedRoute>

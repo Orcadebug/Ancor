@@ -21,7 +21,7 @@ export default function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      setLocation('/');
+      setLocation('/dashboard');
     }
   }, [isAuthenticated, setLocation]);
 
@@ -31,7 +31,7 @@ export default function Login() {
 
     try {
       await signInWithEmail(formData.email, formData.password);
-      setLocation('/');
+      setLocation('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Login failed');
     }

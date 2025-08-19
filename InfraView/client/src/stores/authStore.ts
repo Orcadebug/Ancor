@@ -32,6 +32,10 @@ export const useAuthStore = create<AuthState>()(
       signInWithEmail: async (email: string, password: string) => {
         set({ isLoading: true });
         try {
+          if (!supabase) {
+            throw new Error('Supabase not configured. Please set up your environment variables.');
+          }
+          
           const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
@@ -63,6 +67,10 @@ export const useAuthStore = create<AuthState>()(
       signInWithGoogle: async () => {
         set({ isLoading: true });
         try {
+          if (!supabase) {
+            throw new Error('Supabase not configured. Please set up your environment variables.');
+          }
+          
           const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -121,6 +129,17 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         
         try {
+          if (!supabase) {
+            // If Supabase is not configured, just set loading to false
+            set({ 
+              user: null, 
+              session: null,
+              isAuthenticated: false,
+              isLoading: false 
+            });
+            return;
+          }
+          
           // Get initial session
           const { data: { session } } = await supabase.auth.getSession();
           

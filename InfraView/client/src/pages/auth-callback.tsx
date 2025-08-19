@@ -24,7 +24,7 @@ export default function AuthCallback() {
           // Initialize the auth store with the new session
           await initialize();
           // Redirect to dashboard
-          setLocation('/');
+          setLocation('/dashboard');
         } else {
           // No session found, redirect to login
           setLocation('/login');
