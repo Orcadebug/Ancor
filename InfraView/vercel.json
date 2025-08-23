@@ -3,7 +3,10 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "env": {
-    "VITE_USE_MOCK_DATA": "true"
+    "VITE_USE_MOCK_DATA": "false",
+    "VITE_SUPABASE_URL": "https://uttnerhggnyocazsfmou.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dG5lcmhnZ255b2NhenNmbW91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1ODE5MTIsImV4cCI6MjA3MTE1NzkxMn0.7TDkVqvPDgWUlTv9SrGfPPW8di3Nvuc7iwDTRgGQCLA",
+    "VITE_GOOGLE_CLIENT_ID": "573559141055-p0ghoivp9a0nlocqbge88jm6f6o4v64q.apps.googleusercontent.com"
   },
   "rewrites": [
     {

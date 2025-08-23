@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '@/lib/supabase';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
-import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 interface User {
   id: string;
@@ -29,6 +28,7 @@ interface AuthState {
     organizationName?: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
+  logout: () => Promise<void>;
   initialize: () => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
 }
@@ -226,6 +226,15 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      logout: async () => {
+        await supabase.auth.signOut();
+        set({ 
+          user: null, 
+          session: null,
+          isAuthenticated: false 
+        });
+      },
+
       initialize: async () => {
         set({ isLoading: true });
         
@@ -306,7 +315,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           // Listen for auth changes
-          supabase.auth.onAuthStateChange(async (event, session) => {
+          supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
             console.log('Auth state change:', event, session ? 'with session' : 'no session');
             
             if (event === 'SIGNED_IN' && session?.user) {

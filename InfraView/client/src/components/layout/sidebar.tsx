@@ -98,10 +98,10 @@ export function Sidebar() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-900">
-              {user?.firstName} {user?.lastName}
+              {user?.full_name || user?.email}
             </p>
             <p className="text-xs text-gray-500">
-              {user?.organizationName || user?.role}
+              {user?.role}
             </p>
           </div>
           <DropdownMenu>

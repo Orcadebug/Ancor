@@ -28,9 +28,9 @@ export default function Dashboard() {
   const { user } = useAuthStore();
   
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/dashboard/stats", user?.organizationId],
-    queryFn: () => api.getDashboardStats(user?.organizationId || ""),
-    enabled: !!user?.organizationId,
+    queryKey: ["/api/dashboard/stats", user?.organization_id],
+    queryFn: () => api.getDashboardStats(user?.organization_id || ""),
+    enabled: !!user?.organization_id,
   });
 
   const handleNewDeployment = () => {

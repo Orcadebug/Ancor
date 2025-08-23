@@ -14,9 +14,9 @@ export function ActiveDeployments({ onViewDetails }: ActiveDeploymentsProps) {
   const { user } = useAuthStore();
   
   const { data: deploymentsData, isLoading } = useQuery({
-    queryKey: ["/api/deployments", user?.organizationId],
-    queryFn: () => api.getDeployments(user?.organizationId || ""),
-    enabled: !!user?.organizationId,
+    queryKey: ["/api/deployments", user?.organization_id],
+    queryFn: () => api.getDeployments(user?.organization_id || ""),
+    enabled: !!user?.organization_id,
   });
 
   const deployments = deploymentsData?.deployments || [];
