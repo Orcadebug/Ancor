@@ -19,6 +19,7 @@ import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import AuthCallback from "@/pages/auth-callback";
+import DebugEnv from "@/pages/debug-env";
 
 function Router() {
   return (
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/auth/callback" component={AuthCallback} />
+      <Route path="/debug-env" component={DebugEnv} />
       
       {/* Protected routes */}
       <Route path="/dashboard">
