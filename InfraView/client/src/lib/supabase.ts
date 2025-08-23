@@ -20,12 +20,13 @@ export const supabase = supabaseUrl && supabaseAnonKey
 // Database types based on your schema
 export interface User {
   id: string;
-  username: string;
   email: string;
-  role: string;
+  full_name?: string;
+  avatar_url?: string;
   organization_id?: string;
-  organization_name?: string;
+  role: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Deployment {

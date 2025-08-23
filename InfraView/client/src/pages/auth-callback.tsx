@@ -11,6 +11,14 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        if (!supabase) {
+          console.error('Supabase not configured');
+          setLocation('/login?error=config_error');
+          return;
+        }
+
+        console.log('Handling auth callback...');
+        
         // Handle the OAuth callback
         const { data, error } = await supabase.auth.getSession();
         
@@ -20,6 +28,8 @@ export default function AuthCallback() {
           return;
         }
 
+        console.log('Session data:', data);
+
         if (data.session) {
           // Initialize the auth store with the new session
           await initialize();
@@ -27,6 +37,7 @@ export default function AuthCallback() {
           setLocation('/dashboard');
         } else {
           // No session found, redirect to login
+          console.log('No session found, redirecting to login');
           setLocation('/login');
         }
       } catch (error) {

@@ -1,7 +1,19 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { supabase, type User } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import type { User as SupabaseUser, Session } from '@supabase/supabase-js';
+
+interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  organization_id?: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthState {
   user: User | null;
@@ -13,7 +25,7 @@ interface AuthState {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string, userData: {
-    username: string;
+    fullName: string;
     organizationName?: string;
   }) => Promise<void>;
   signOut: () => Promise<void>;
@@ -36,29 +48,95 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Supabase not configured. Please set up your environment variables.');
           }
           
-          const { data, error } = await supabase.auth.signInWithPassword({
+          console.log('Attempting email sign in for:', email);
+          
+          // Add timeout to prevent hanging
+          const signInPromise = supabase.auth.signInWithPassword({
             email,
             password,
           });
           
-          if (error) throw error;
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Sign in timeout - please try again')), 15000);
+          });
+          
+          const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
+          
+          if (error) {
+            console.error('Sign in error:', error);
+            throw error;
+          }
+          
+          console.log('Sign in successful, fetching profile...');
           
           // Fetch user profile from public.users table
           if (data.user) {
-            const { data: profile } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', data.user.id)
-              .single();
-            
-            set({ 
-              user: profile, 
-              session: data.session,
-              isAuthenticated: true,
-              isLoading: false 
-            });
+            try {
+              const profilePromise = supabase
+                .from('users')
+                .select('*')
+                .eq('id', data.user.id)
+                .single();
+                
+              const profileTimeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Profile fetch timeout')), 5000);
+              });
+              
+              const { data: profile, error: profileError } = await Promise.race([
+                profilePromise, 
+                profileTimeoutPromise
+              ]);
+              
+              if (profileError) {
+                console.warn('Profile fetch error, using basic profile:', profileError);
+                // If profile doesn't exist, create a basic one
+                const basicProfile = {
+                  id: data.user.id,
+                  email: data.user.email || '',
+                  full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || '',
+                  avatar_url: data.user.user_metadata?.avatar_url || '',
+                  role: 'user',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+                
+                set({ 
+                  user: basicProfile, 
+                  session: data.session,
+                  isAuthenticated: true,
+                  isLoading: false 
+                });
+              } else {
+                set({ 
+                  user: profile, 
+                  session: data.session,
+                  isAuthenticated: true,
+                  isLoading: false 
+                });
+              }
+            } catch (profileError) {
+              console.warn('Profile fetch failed, proceeding with basic profile:', profileError);
+              // Still set authenticated with basic profile
+              const basicProfile = {
+                id: data.user.id,
+                email: data.user.email || '',
+                full_name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || '',
+                avatar_url: data.user.user_metadata?.avatar_url || '',
+                role: 'user',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              set({ 
+                user: basicProfile, 
+                session: data.session,
+                isAuthenticated: true,
+                isLoading: false 
+              });
+            }
           }
         } catch (error) {
+          console.error('Auth error:', error);
           set({ isLoading: false });
           throw error;
         }
@@ -71,6 +149,7 @@ export const useAuthStore = create<AuthState>()(
             throw new Error('Supabase not configured. Please set up your environment variables.');
           }
           
+          console.log('Attempting Google sign in...');
           const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -78,18 +157,22 @@ export const useAuthStore = create<AuthState>()(
             }
           });
           
-          if (error) throw error;
+          if (error) {
+            console.error('Google sign in error:', error);
+            throw error;
+          }
           
           // The actual user setting will happen in the auth callback
-          set({ isLoading: false });
+          // Don't set loading to false here as we're redirecting
         } catch (error) {
+          console.error('Google auth error:', error);
           set({ isLoading: false });
           throw error;
         }
       },
 
       signUp: async (email: string, password: string, userData: {
-        username: string;
+        fullName: string;
         organizationName?: string;
       }) => {
         set({ isLoading: true });
@@ -99,7 +182,7 @@ export const useAuthStore = create<AuthState>()(
             password,
             options: {
               data: {
-                username: userData.username,
+                full_name: userData.fullName,
                 organization_name: userData.organizationName
               }
             }
@@ -130,7 +213,7 @@ export const useAuthStore = create<AuthState>()(
         
         try {
           if (!supabase) {
-            // If Supabase is not configured, just set loading to false
+            console.warn('Supabase not configured, skipping auth initialization');
             set({ 
               user: null, 
               session: null,
@@ -140,23 +223,61 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
           
-          // Get initial session
-          const { data: { session } } = await supabase.auth.getSession();
+          console.log('Initializing auth...');
+          
+          // Add timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Auth initialization timeout')), 10000);
+          });
+          
+          // Get initial session with timeout
+          const sessionPromise = supabase.auth.getSession();
+          const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+          
+          console.log('Initial session:', session ? 'Found' : 'None');
           
           if (session?.user) {
-            // Fetch user profile
-            const { data: profile } = await supabase
+            console.log('Fetching user profile for:', session.user.id);
+            
+            // Fetch user profile with timeout
+            const profilePromise = supabase
               .from('users')
               .select('*')
               .eq('id', session.user.id)
               .single();
+              
+            const { data: profile, error: profileError } = await Promise.race([
+              profilePromise, 
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Profile fetch timeout')), 5000))
+            ]);
             
-            set({ 
-              user: profile, 
-              session,
-              isAuthenticated: true,
-              isLoading: false 
-            });
+            if (profileError) {
+              console.warn('Profile fetch error, using basic profile:', profileError);
+              // Create basic profile from auth user
+              const basicProfile = {
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+                avatar_url: session.user.user_metadata?.avatar_url || '',
+                role: 'user',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              };
+              
+              set({ 
+                user: basicProfile, 
+                session,
+                isAuthenticated: true,
+                isLoading: false 
+              });
+            } else {
+              set({ 
+                user: profile, 
+                session,
+                isAuthenticated: true,
+                isLoading: false 
+              });
+            }
           } else {
             set({ 
               user: null, 
@@ -168,20 +289,43 @@ export const useAuthStore = create<AuthState>()(
 
           // Listen for auth changes
           supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state change:', event, session ? 'with session' : 'no session');
+            
             if (event === 'SIGNED_IN' && session?.user) {
               // Fetch user profile
-              const { data: profile } = await supabase
+              const { data: profile, error: profileError } = await supabase
                 .from('users')
                 .select('*')
                 .eq('id', session.user.id)
                 .single();
               
-              set({ 
-                user: profile, 
-                session,
-                isAuthenticated: true,
-                isLoading: false 
-              });
+              if (profileError) {
+                console.warn('Profile fetch error on sign in:', profileError);
+                // Use basic profile
+                const basicProfile = {
+                  id: session.user.id,
+                  email: session.user.email || '',
+                  full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
+                  avatar_url: session.user.user_metadata?.avatar_url || '',
+                  role: 'user',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                };
+                
+                set({ 
+                  user: basicProfile, 
+                  session,
+                  isAuthenticated: true,
+                  isLoading: false 
+                });
+              } else {
+                set({ 
+                  user: profile, 
+                  session,
+                  isAuthenticated: true,
+                  isLoading: false 
+                });
+              }
             } else if (event === 'SIGNED_OUT') {
               set({ 
                 user: null, 
@@ -191,6 +335,8 @@ export const useAuthStore = create<AuthState>()(
               });
             }
           });
+          
+          console.log('Auth initialization completed');
         } catch (error) {
           console.error('Auth initialization error:', error);
           set({ 

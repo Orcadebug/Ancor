@@ -33,7 +33,20 @@ export default function Login() {
       await signInWithEmail(formData.email, formData.password);
       setLocation('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      console.error('Login error:', err);
+      let errorMessage = 'Login failed';
+      
+      if (err.message?.includes('Invalid login credentials')) {
+        errorMessage = 'Invalid email or password. Please check your credentials.';
+      } else if (err.message?.includes('Email not confirmed')) {
+        errorMessage = 'Please check your email and confirm your account.';
+      } else if (err.message?.includes('Supabase not configured')) {
+        errorMessage = 'Authentication service not configured. Please contact support.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     }
   };
 
@@ -43,7 +56,18 @@ export default function Login() {
       await signInWithGoogle();
       // Redirect will happen automatically after OAuth callback
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed');
+      console.error('Google sign-in error:', err);
+      let errorMessage = 'Google sign-in failed';
+      
+      if (err.message?.includes('Supabase not configured')) {
+        errorMessage = 'Authentication service not configured. Please contact support.';
+      } else if (err.message?.includes('OAuth')) {
+        errorMessage = 'Google OAuth not properly configured. Please contact support.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     }
   };
 

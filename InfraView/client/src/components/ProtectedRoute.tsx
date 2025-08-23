@@ -13,12 +13,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     // Initialize auth on first load
-    initialize();
+    console.log('ProtectedRoute: Initializing auth...');
+    initialize().catch(error => {
+      console.error('ProtectedRoute: Auth initialization failed:', error);
+    });
   }, [initialize]);
 
   useEffect(() => {
     // Redirect to login if not authenticated and not loading
+    console.log('ProtectedRoute: Auth state check - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
     if (!isLoading && !isAuthenticated) {
+      console.log('ProtectedRoute: Redirecting to login');
       setLocation('/login');
     }
   }, [isAuthenticated, isLoading, setLocation]);

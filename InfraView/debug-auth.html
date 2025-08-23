@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Debug</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Supabase Auth Debug</h1>
+    <div id="status"></div>
+    <button onclick="testConnection()">Test Connection</button>
+    <button onclick="testGoogleAuth()">Test Google Auth</button>
+    <button onclick="testEmailAuth()">Test Email Auth</button>
+    
+    <script>
+        const SUPABASE_URL = 'https://uttnerhggnyocazsfmou.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0dG5lcmhnZ255b2NhenNmbW91Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU1ODE5MTIsImV4cCI6MjA3MTE1NzkxMn0.7TDkVqvPDgWUlTv9SrGfPPW8di3Nvuc7iwDTRgGQCLA';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        function log(message) {
+            console.log(message);
+            document.getElementById('status').innerHTML += '<p>' + message + '</p>';
+        }
+        
+        async function testConnection() {
+            log('Testing Supabase connection...');
+            try {
+                const { data, error } = await supabase.from('users').select('count').limit(1);
+                if (error) {
+                    log('❌ Connection failed: ' + error.message);
+                } else {
+                    log('✅ Connection successful');
+                }
+            } catch (err) {
+                log('❌ Connection error: ' + err.message);
+            }
+        }
+        
+        async function testGoogleAuth() {
+            log('Testing Google OAuth...');
+            try {
+                const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin + '/auth/callback'
+                    }
+                });
+                if (error) {
+                    log('❌ Google auth failed: ' + error.message);
+                } else {
+                    log('✅ Google auth initiated (should redirect)');
+                }
+            } catch (err) {
+                log('❌ Google auth error: ' + err.message);
+            }
+        }
+        
+        async function testEmailAuth() {
+            const email = prompt('Enter test email:');
+            const password = prompt('Enter test password:');
+            
+            if (!email || !password) return;
+            
+            log('Testing email auth...');
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                if (error) {
+                    log('❌ Email auth failed: ' + error.message);
+                } else {
+                    log('✅ Email auth successful');
+                    log('User: ' + JSON.stringify(data.user, null, 2));
+                }
+            } catch (err) {
+                log('❌ Email auth error: ' + err.message);
+            }
+        }
+        
+        // Test on load
+        testConnection();
+    </script>
+</body>
+</html>
