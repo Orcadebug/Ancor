@@ -10,7 +10,7 @@ import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 
 export default function Register() {
   const [, setLocation] = useLocation();
-  const { register, isLoading } = useAuthStore();
+  const { signUp, isLoading } = useAuthStore();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -39,16 +39,32 @@ export default function Register() {
     }
 
     try {
-      await register({
-        email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        companyName: formData.companyName || undefined,
+      console.log('Attempting to register user:', formData.email);
+      await signUp(formData.email, formData.password, {
+        fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+        organizationName: formData.companyName || undefined,
       });
+      console.log('Registration successful');
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      console.error('Registration error:', err);
+      let errorMessage = 'Registration failed';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('User already registered')) {
+          errorMessage = 'An account with this email already exists. Please sign in instead.';
+        } else if (err.message.includes('Password should be at least')) {
+          errorMessage = 'Password must be at least 6 characters long.';
+        } else if (err.message.includes('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (err.message.includes('Supabase not configured')) {
+          errorMessage = 'Registration service not configured. Please contact support.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     }
   };
 

@@ -177,7 +177,14 @@ export const useAuthStore = create<AuthState>()(
       }) => {
         set({ isLoading: true });
         try {
-          const { data, error } = await supabase.auth.signUp({
+          if (!supabase) {
+            throw new Error('Supabase not configured. Please set up your environment variables.');
+          }
+          
+          console.log('Attempting to sign up user:', email);
+          
+          // Add timeout to prevent hanging
+          const signUpPromise = supabase.auth.signUp({
             email,
             password,
             options: {
@@ -188,12 +195,23 @@ export const useAuthStore = create<AuthState>()(
             }
           });
           
-          if (error) throw error;
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Sign up timeout - please try again')), 15000);
+          });
           
+          const { data, error } = await Promise.race([signUpPromise, timeoutPromise]);
+          
+          if (error) {
+            console.error('Sign up error:', error);
+            throw error;
+          }
+          
+          console.log('Sign up successful:', data.user ? 'User created' : 'Confirmation required');
           set({ isLoading: false });
           
           // User profile will be created automatically by the database trigger
         } catch (error) {
+          console.error('Sign up failed:', error);
           set({ isLoading: false });
           throw error;
         }
