@@ -7,6 +7,10 @@ console.log('🔄 Starting AI Infrastructure Platform API...');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Environment detection
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isProduction = process.env.NODE_ENV === 'production';
+
 console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🚪 Port: ${PORT}`);
 
@@ -28,9 +32,33 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging
+// Enhanced request logging with timing
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+  const start = Date.now();
+  const path = req.path;
+  let capturedJsonResponse;
+
+  const originalResJson = res.json;
+  res.json = function (bodyJson, ...args) {
+    capturedJsonResponse = bodyJson;
+    return originalResJson.apply(res, [bodyJson, ...args]);
+  };
+
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+    
+    if (path.startsWith("/api") && capturedJsonResponse && isDevelopment) {
+      logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+    }
+
+    if (logLine.length > 100) {
+      logLine = logLine.slice(0, 99) + "…";
+    }
+
+    console.log(logLine);
+  });
+
   next();
 });
 
