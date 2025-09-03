@@ -11,6 +11,10 @@ const PORT = process.env.PORT || 3001;
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Import Supabase and auth middleware
+const { supabase } = require('./supabase-client');
+const { authenticateSupabaseUser, optionalAuth } = require('./auth-middleware');
+
 console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 console.log(`🚪 Port: ${PORT}`);
 
@@ -96,49 +100,83 @@ const upload = multer({ storage: multer.memoryStorage() });
 // Initialize Azure service
 const azureService = new AzureService();
 
-// In-memory storage for demo (use database in production)
-const deployments = new Map();
-const documents = new Map();
+console.log('✅ Services initialized - Supabase + Azure integration ready');
 
 // Dashboard stats API
-app.get('/api/dashboard/stats/:orgId', (req, res) => {
-  console.log('📊 Dashboard stats requested for org:', req.params.orgId);
-  
-  const orgDeployments = Array.from(deployments.values())
-    .filter(d => d.orgId === req.params.orgId);
-  
-  const activeCount = orgDeployments.filter(d => d.status === 'active').length;
-  const totalCost = orgDeployments.reduce((sum, d) => sum + (d.monthly_cost || 0), 0);
-  const docCount = Array.from(documents.values()).length;
-  
-  res.json({
-    activeDeployments: activeCount,
-    documentsProcessed: docCount,
-    monthlyCost: totalCost,
-    successRate: 98.5
-  });
+app.get('/api/dashboard/stats/:orgId', authenticateSupabaseUser, async (req, res) => {
+  try {
+    console.log('📊 Dashboard stats requested for user:', req.user.id);
+    
+    // Get deployments for the authenticated user
+    const { data: deployments, error: deploymentsError } = await supabase
+      .from('deployments')
+      .select('*')
+      .eq('user_id', req.user.id);
+    
+    if (deploymentsError) {
+      console.error('Error fetching deployments:', deploymentsError);
+      return res.status(500).json({ success: false, error: 'Failed to fetch deployments' });
+    }
+    
+    // Get documents for the authenticated user
+    const { data: documents, error: documentsError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('user_id', req.user.id);
+    
+    if (documentsError) {
+      console.error('Error fetching documents:', documentsError);
+      return res.status(500).json({ success: false, error: 'Failed to fetch documents' });
+    }
+    
+    const activeCount = deployments?.filter(d => d.status === 'active').length || 0;
+    const totalCost = deployments?.reduce((sum, d) => sum + (d.monthly_cost || 0), 0) || 0;
+    const docCount = documents?.length || 0;
+    
+    res.json({
+      activeDeployments: activeCount,
+      documentsProcessed: docCount,
+      monthlyCost: totalCost,
+      successRate: 98.5
+    });
+  } catch (error) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch dashboard stats' });
+  }
 });
 
 // Get deployments for organization
-app.get('/api/deployments/organization/:orgId', (req, res) => {
-  console.log('🚀 Deployments requested for org:', req.params.orgId);
-  
-  const orgDeployments = Array.from(deployments.values())
-    .filter(d => d.orgId === req.params.orgId);
-  
-  res.json({
-    deployments: orgDeployments
-  });
+app.get('/api/deployments/organization/:orgId', authenticateSupabaseUser, async (req, res) => {
+  try {
+    console.log('🚀 Deployments requested for user:', req.user.id);
+    
+    const { data: deployments, error } = await supabase
+      .from('deployments')
+      .select('*')
+      .eq('user_id', req.user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching deployments:', error);
+      return res.status(500).json({ success: false, error: 'Failed to fetch deployments' });
+    }
+    
+    res.json({
+      deployments: deployments || []
+    });
+  } catch (error) {
+    console.error('Deployments fetch error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch deployments' });
+  }
 });
 
 // Create new deployment (REAL AZURE DEPLOYMENT)
-app.post('/api/deployments', async (req, res) => {
+app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
   try {
-    console.log('🚀 Creating REAL Azure deployment:', req.body);
+    console.log('🚀 Creating REAL Azure deployment for user:', req.user.id);
     const { name, industry, model, provider } = req.body;
     
     const deploymentId = `dep-${Date.now()}`;
-    const orgId = req.body.orgId || 'demo-org';
     
     // Calculate costs
     const modelCosts = {
@@ -151,21 +189,29 @@ app.post('/api/deployments', async (req, res) => {
     const platformFee = baseCost * 0.07; // 7% markup
     const totalCost = baseCost + platformFee;
     
-    // Create deployment record
-    const deployment = {
+    // Create deployment record in Supabase
+    const deploymentData = {
       id: deploymentId,
-      orgId,
+      user_id: req.user.id,
       name,
       industry,
       model,
       provider: 'azure',
       status: 'deploying',
       monthly_cost: totalCost,
-      platform_fee: platformFee,
-      created_at: new Date().toISOString()
+      platform_fee: platformFee
     };
     
-    deployments.set(deploymentId, deployment);
+    const { data: deployment, error } = await supabase
+      .from('deployments')
+      .insert([deploymentData])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating deployment in Supabase:', error);
+      return res.status(500).json({ success: false, error: 'Failed to create deployment' });
+    }
     
     // Start real Azure deployment (async)
     azureService.createDeployment({
@@ -173,20 +219,34 @@ app.post('/api/deployments', async (req, res) => {
       name,
       industry,
       model
-    }).then(result => {
+    }).then(async (result) => {
       // Update deployment with Azure details
-      deployment.status = 'active';
-      deployment.api_url = result.apiUrl;
-      deployment.public_ip = result.publicIP;
-      deployment.storage_container = result.storageContainer;
-      deployments.set(deploymentId, deployment);
+      const { error: updateError } = await supabase
+        .from('deployments')
+        .update({
+          status: 'active',
+          api_url: result.apiUrl,
+          public_ip: result.publicIP,
+          storage_container: result.storageContainer
+        })
+        .eq('id', deploymentId);
       
-      console.log(`✅ Azure deployment completed: ${deploymentId}`);
-    }).catch(error => {
+      if (updateError) {
+        console.error('Error updating deployment:', updateError);
+      } else {
+        console.log(`✅ Azure deployment completed: ${deploymentId}`);
+      }
+    }).catch(async (error) => {
       console.error(`❌ Azure deployment failed: ${deploymentId}`, error);
-      deployment.status = 'failed';
-      deployment.error = error.message;
-      deployments.set(deploymentId, deployment);
+      
+      // Update deployment status to failed
+      await supabase
+        .from('deployments')
+        .update({
+          status: 'failed',
+          error_message: error.message
+        })
+        .eq('id', deploymentId);
     });
     
     res.json({
@@ -205,12 +265,18 @@ app.post('/api/deployments', async (req, res) => {
 });
 
 // Get specific deployment
-app.get('/api/deployments/:id', async (req, res) => {
+app.get('/api/deployments/:id', authenticateSupabaseUser, async (req, res) => {
   try {
     const deploymentId = req.params.id;
-    const deployment = deployments.get(deploymentId);
     
-    if (!deployment) {
+    const { data: deployment, error } = await supabase
+      .from('deployments')
+      .select('*')
+      .eq('id', deploymentId)
+      .eq('user_id', req.user.id) // Ensure user owns this deployment
+      .single();
+    
+    if (error || !deployment) {
       return res.status(404).json({
         success: false,
         error: 'Deployment not found'
@@ -221,9 +287,22 @@ app.get('/api/deployments/:id', async (req, res) => {
     if (deployment.status === 'deploying' || deployment.status === 'active') {
       try {
         const azureStatus = await azureService.getDeploymentStatus(deploymentId);
-        deployment.status = azureStatus.status;
-        deployment.api_url = azureStatus.apiUrl;
-        deployments.set(deploymentId, deployment);
+        
+        // Update status in Supabase if changed
+        if (azureStatus.status !== deployment.status) {
+          const { error: updateError } = await supabase
+            .from('deployments')
+            .update({
+              status: azureStatus.status,
+              api_url: azureStatus.apiUrl
+            })
+            .eq('id', deploymentId);
+          
+          if (!updateError) {
+            deployment.status = azureStatus.status;
+            deployment.api_url = azureStatus.apiUrl;
+          }
+        }
       } catch (error) {
         console.error('Failed to get Azure status:', error);
       }
