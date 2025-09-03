@@ -7,12 +7,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase environment variables not configured. Authentication will not work.');
 }
 
+// Get the current URL for redirect configuration
+const getRedirectUrl = () => {
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/auth-callback`;
+  }
+  return 'http://localhost:3002/auth-callback';
+};
+
 export const supabase = supabaseUrl && supabaseAnonKey 
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: true
+        detectSessionInUrl: true,
+        redirectTo: getRedirectUrl()
       }
     })
   : null;
