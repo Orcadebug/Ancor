@@ -27,7 +27,8 @@
     "setup:backend": "cd backend && npm install"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "autoprefixer": "^10.4.20"
   },
   "keywords": [
     "ai",
