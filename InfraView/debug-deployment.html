@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Deployment API</title>
+</head>
+<body>
+    <h1>Debug Deployment API</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <div id="result"></div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                // Test basic API connectivity
+                console.log('Testing API connectivity...');
+                const healthResponse = await fetch('https://ancor-production.up.railway.app/health');
+                const healthData = await healthResponse.json();
+                console.log('Health check:', healthData);
+                
+                // Test deployment endpoint without auth (should get 401)
+                console.log('Testing deployment endpoint without auth...');
+                const noAuthResponse = await fetch('https://ancor-production.up.railway.app/api/deployments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: 'test',
+                        industry: 'legal',
+                        model: 'llama-3-8b',
+                        provider: 'azure'
+                    })
+                });
+                
+                console.log('No auth response status:', noAuthResponse.status);
+                const noAuthData = await noAuthResponse.json();
+                console.log('No auth response:', noAuthData);
+                
+                resultDiv.innerHTML = `
+                    <h3>Results:</h3>
+                    <p><strong>Health Check:</strong> ${JSON.stringify(healthData)}</p>
+                    <p><strong>No Auth Response:</strong> ${noAuthResponse.status} - ${JSON.stringify(noAuthData)}</p>
+                `;
+                
+            } catch (error) {
+                console.error('Test failed:', error);
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

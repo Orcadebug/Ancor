@@ -49,10 +49,31 @@ export default function DeploymentWizard() {
     } else {
       // Deploy the system with real API call
       try {
-        console.log("Deploying with data:", formData);
+        console.log("🚀 Starting deployment with data:", formData);
+        
+        // Check authentication first
+        const { useAuthStore } = await import("@/stores/authStore");
+        const { session, user, isAuthenticated } = useAuthStore.getState();
+        
+        console.log("🔐 Auth status:", {
+          isAuthenticated,
+          hasSession: !!session,
+          hasUser: !!user,
+          hasAccessToken: !!session?.access_token
+        });
+        
+        if (!isAuthenticated || !session?.access_token) {
+          console.error("❌ User not authenticated");
+          alert("Please login first to create deployments.");
+          setLocation("/login");
+          return;
+        }
         
         // Import Supabase API client and make deployment request
         const { apiClient } = await import("@/lib/supabase-api");
+        
+        console.log("📡 Making API call to:", `${import.meta.env.VITE_API_URL}/api/deployments`);
+        
         const result = await apiClient.post("/api/deployments", {
           name: formData.name,
           industry: formData.industry,
@@ -67,8 +88,22 @@ export default function DeploymentWizard() {
         setLocation("/dashboard");
         
       } catch (error) {
-        console.error("❌ Deployment failed:", error);
-        alert("Deployment failed. Please check your connection and try again.");
+        console.error("❌ Deployment failed with error:", error);
+        console.error("❌ Error details:", {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        
+        // More specific error messages
+        if (error.message.includes("401")) {
+          alert("Authentication failed. Please login again.");
+          setLocation("/login");
+        } else if (error.message.includes("fetch")) {
+          alert("Network error. Please check your internet connection and try again.");
+        } else {
+          alert(`Deployment failed: ${error.message}`);
+        }
       }
     }
   };
