@@ -43,13 +43,33 @@ export default function DeploymentWizard() {
     { number: 4, title: "Deploy", subtitle: "Launch system" },
   ];
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Deploy the system
-      console.log("Deploying with data:", formData);
-      setLocation("/");
+      // Deploy the system with real API call
+      try {
+        console.log("Deploying with data:", formData);
+        
+        // Import Supabase API client and make deployment request
+        const { apiClient } = await import("@/lib/supabase-api");
+        const result = await apiClient.post("/api/deployments", {
+          name: formData.name,
+          industry: formData.industry,
+          model: formData.model,
+          provider: formData.provider,
+          description: `${formData.industry} deployment using ${formData.model} on ${formData.provider}`
+        });
+        
+        console.log("✅ Deployment created successfully:", result);
+        
+        // Navigate to dashboard to see the new deployment
+        setLocation("/dashboard");
+        
+      } catch (error) {
+        console.error("❌ Deployment failed:", error);
+        alert("Deployment failed. Please check your connection and try again.");
+      }
     }
   };
 
