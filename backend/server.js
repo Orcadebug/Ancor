@@ -175,6 +175,8 @@ app.get('/api/deployments/organization/:orgId', authenticateSupabaseUser, async 
 app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
   try {
     console.log('🚀 Creating REAL Azure deployment for user:', req.user.id);
+    console.log('📝 Request body:', req.body);
+    console.log('👤 User info:', req.user);
     const { name, industry, model, provider } = req.body;
     
     const deploymentId = `dep-${Date.now()}`;
@@ -193,14 +195,22 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
     // Create deployment record in Supabase
     const deploymentData = {
       id: deploymentId,
-      user_id: req.user.id,
+      organization_id: req.user.organization_id || req.user.id, // Use org_id or fallback to user_id
       name,
-      industry,
-      model,
-      provider: 'azure',
-      status: 'deploying',
-      monthly_cost: totalCost,
-      platform_fee: platformFee
+      industry_template: industry,
+      cloud_provider: provider || 'azure',
+      region: 'us-east-1', // Default region
+      model_size: model.replace('llama-3-', ''), // Extract size (8b, 70b, 405b)
+      gpu_type: 'A100', // Default GPU type
+      gpu_count: 1,
+      status: 'provisioning',
+      cost_per_hour: totalCost / (24 * 30), // Convert monthly to hourly
+      configuration: {
+        industry,
+        model,
+        provider,
+        description: `${industry} deployment using ${model} on ${provider}`
+      }
     };
     
     const { data: deployment, error } = await supabase
@@ -210,8 +220,15 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
       .single();
     
     if (error) {
-      console.error('Error creating deployment in Supabase:', error);
-      return res.status(500).json({ success: false, error: 'Failed to create deployment' });
+      console.error('❌ Error creating deployment in Supabase:', error);
+      console.error('❌ Deployment data that failed:', deploymentData);
+      console.error('❌ User info:', req.user);
+      return res.status(500).json({ 
+        success: false, 
+        error: 'Failed to create deployment',
+        details: error.message,
+        code: error.code
+      });
     }
     
     // Start real Azure deployment (async)
