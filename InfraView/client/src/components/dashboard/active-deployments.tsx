@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { Deployment } from "@shared/schema";
 import { useAuthStore } from "@/stores/authStore";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/supabase-api";
 
 interface ActiveDeploymentsProps {
   onViewDetails?: (deployment: Deployment) => void;
@@ -15,8 +15,11 @@ export function ActiveDeployments({ onViewDetails }: ActiveDeploymentsProps) {
   
   const { data: deploymentsData, isLoading } = useQuery({
     queryKey: ["/api/deployments", user?.organization_id],
-    queryFn: () => api.getDeployments(user?.organization_id || ""),
-    enabled: !!user?.organization_id,
+    queryFn: async () => {
+      const result = await apiClient.get(`/api/deployments/organization/${user?.organization_id || user?.id}`);
+      return result;
+    },
+    enabled: !!user,
   });
 
   const deployments = deploymentsData?.deployments || [];

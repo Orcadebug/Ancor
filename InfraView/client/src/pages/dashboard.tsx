@@ -11,7 +11,7 @@ import { DeploymentDetailsModal } from "@/components/modals/deployment-details-m
 import { Deployment } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useAuthStore } from "@/stores/authStore";
-import { api } from "@/lib/api";
+import { apiClient } from "@/lib/supabase-api";
 
 interface DashboardStats {
   activeDeployments: number;
@@ -29,8 +29,11 @@ export default function Dashboard() {
   
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats", user?.organization_id],
-    queryFn: () => api.getDashboardStats(user?.organization_id || ""),
-    enabled: !!user?.organization_id,
+    queryFn: async () => {
+      const result = await apiClient.get(`/api/dashboard/stats/${user?.organization_id || user?.id}`);
+      return result;
+    },
+    enabled: !!user,
   });
 
   const handleNewDeployment = () => {
