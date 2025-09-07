@@ -25,6 +25,7 @@ const corsOptions = {
     'http://localhost:3000', 
     'https://ancor-infraview.vercel.app',
     'https://ancor.vercel.app',
+    'https://ancor-backend.vercel.app',
     process.env.FRONTEND_URL
   ].filter(Boolean),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
