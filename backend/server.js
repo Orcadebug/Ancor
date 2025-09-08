@@ -230,8 +230,13 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
     const platformFee = baseCost * 0.07; // 7% markup
     const totalCost = baseCost + platformFee;
     
-    // Create deployment record in Supabase (let DB generate UUID)
+    // Generate UUID for deployment
+    const { randomUUID } = require('crypto');
+    const dbDeploymentId = randomUUID();
+    
+    // Create deployment record in Supabase
     const deploymentData = {
+      id: dbDeploymentId, // Explicitly set UUID
       organization_id: req.user.organization_id || req.user.id, // Use org_id or fallback to user_id
       name,
       industry_template: industry,
@@ -247,7 +252,7 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
         model,
         provider,
         description: `${industry} deployment using ${model} on ${provider}`,
-        deploymentId // Store the generated ID for Azure reference
+        azureDeploymentId: deploymentId // Store the Azure reference ID
       }
     };
     
@@ -288,7 +293,7 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
             storageContainer: result.storageContainer
           }
         })
-        .eq('id', deployment.id);
+        .eq('id', dbDeploymentId);
       
       if (updateError) {
         console.error('Error updating deployment:', updateError);
@@ -308,7 +313,7 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
             error_message: error.message
           }
         })
-        .eq('id', deployment.id);
+        .eq('id', dbDeploymentId);
     });
     
     res.json({
