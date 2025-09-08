@@ -360,13 +360,13 @@ app.get('/api/deployments/:id', authenticateSupabaseUser, async (req, res) => {
             .from('deployments')
             .update({
               status: azureStatus.status,
-              api_url: azureStatus.apiUrl
+              endpoint_url: azureStatus.apiUrl
             })
             .eq('id', deploymentId);
           
           if (!updateError) {
             deployment.status = azureStatus.status;
-            deployment.api_url = azureStatus.apiUrl;
+            deployment.endpoint_url = azureStatus.apiUrl;
           }
         }
       } catch (error) {
@@ -384,6 +384,102 @@ app.get('/api/deployments/:id', authenticateSupabaseUser, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to get deployment'
+    });
+  }
+});
+
+// Stop/terminate deployment
+app.delete('/api/deployments/:id', authenticateSupabaseUser, async (req, res) => {
+  try {
+    const deploymentId = req.params.id;
+    
+    console.log('🛑 Stopping deployment:', deploymentId, 'for user:', req.user.id);
+    
+    // Get deployment to verify ownership and get Azure details
+    const { data: deployment, error: fetchError } = await supabase
+      .from('deployments')
+      .select('*')
+      .eq('id', deploymentId)
+      .single();
+    
+    if (fetchError || !deployment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Deployment not found'
+      });
+    }
+    
+    // Check if deployment can be stopped
+    if (deployment.status === 'terminated') {
+      return res.status(400).json({
+        success: false,
+        error: 'Deployment is already terminated'
+      });
+    }
+    
+    // Update status to terminating first
+    const { error: updateError } = await supabase
+      .from('deployments')
+      .update({
+        status: 'terminating',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', deploymentId);
+    
+    if (updateError) {
+      console.error('Error updating deployment status:', updateError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to update deployment status'
+      });
+    }
+    
+    // Stop Azure deployment (async)
+    azureService.stopDeployment(deploymentId, deployment.configuration?.azureDeploymentId)
+      .then(async () => {
+        // Update to terminated status
+        await supabase
+          .from('deployments')
+          .update({
+            status: 'terminated',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', deploymentId);
+        
+        console.log(`✅ Deployment terminated: ${deploymentId}`);
+      })
+      .catch(async (error) => {
+        console.error(`❌ Failed to stop Azure deployment: ${deploymentId}`, error);
+        
+        // Update to error status
+        await supabase
+          .from('deployments')
+          .update({
+            status: 'error',
+            configuration: {
+              ...deployment.configuration,
+              error_message: `Failed to terminate: ${error.message}`
+            },
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', deploymentId);
+      });
+    
+    res.json({
+      success: true,
+      message: 'Deployment termination initiated',
+      deployment: {
+        ...deployment,
+        status: 'terminating'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Failed to stop deployment:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to stop deployment',
+      details: error.message
     });
   }
 });

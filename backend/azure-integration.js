@@ -325,23 +325,67 @@ class AzureService {
   }
 
   /**
-   * Delete deployment
+   * Stop/terminate deployment
    */
-  async deleteDeployment(deploymentId) {
+  async stopDeployment(deploymentId, azureDeploymentId) {
     try {
-      const containerName = `deployment-${deploymentId}`;
+      console.log(`🛑 Stopping Azure deployment: ${deploymentId}`);
       
-      // Delete storage container
-      const containerClient = this.blobServiceClient.getContainerClient(containerName);
-      await containerClient.delete();
+      // If no Azure credentials, return mock success
+      if (!this.containerClient) {
+        console.log('⚠️ No Azure credentials, using mock termination');
+        return { success: true, message: 'Mock deployment terminated' };
+      }
       
-      console.log(`🗑️ Deployment deleted: ${deploymentId}`);
-      return { success: true };
+      const containerGroupName = `ai-deployment-${azureDeploymentId || deploymentId}`;
+      
+      try {
+        // Delete Azure Container Instance
+        console.log(`🗑️ Deleting Azure Container Instance: ${containerGroupName}`);
+        
+        await this.containerClient.containerGroups.beginDeleteAndWait(
+          this.resourceGroupName,
+          containerGroupName
+        );
+        
+        console.log(`✅ Azure Container Instance deleted: ${containerGroupName}`);
+        
+      } catch (azureError) {
+        if (azureError.statusCode === 404) {
+          console.log(`⚠️ Container group not found (already deleted): ${containerGroupName}`);
+        } else {
+          throw azureError;
+        }
+      }
+      
+      // Clean up storage container
+      try {
+        const containerName = `deployment-${deploymentId}`;
+        const containerClient = this.blobServiceClient.getContainerClient(containerName);
+        await containerClient.delete();
+        console.log(`🗑️ Storage container deleted: ${containerName}`);
+      } catch (storageError) {
+        console.warn('⚠️ Failed to delete storage container:', storageError.message);
+        // Don't fail the whole operation if storage cleanup fails
+      }
+      
+      return { 
+        success: true, 
+        message: 'Deployment terminated successfully',
+        containerGroupName 
+      };
       
     } catch (error) {
-      console.error('❌ Failed to delete deployment:', error);
-      throw error;
+      console.error('❌ Failed to stop deployment:', error);
+      throw new Error(`Failed to terminate Azure deployment: ${error.message}`);
     }
+  }
+
+  /**
+   * Delete deployment (alias for stopDeployment for backward compatibility)
+   */
+  async deleteDeployment(deploymentId) {
+    return this.stopDeployment(deploymentId);
   }
 
   /**
