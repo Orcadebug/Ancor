@@ -89,6 +89,37 @@ app.get('/api/test-auth', authenticateSupabaseUser, (req, res) => {
   });
 });
 
+// Test Azure connectivity endpoint
+app.get('/api/test-azure', async (req, res) => {
+  try {
+    console.log('🧪 Azure connectivity test requested');
+    
+    const testResults = await azureService.testAzureConnection();
+    
+    res.json({
+      success: true,
+      azure: {
+        configured: !!azureService.containerClient,
+        containerClient: testResults.containerClient,
+        storageClient: testResults.storageClient,
+        errors: testResults.errors,
+        mode: azureService.containerClient ? 'REAL' : 'MOCK'
+      },
+      message: azureService.containerClient ? 
+        'Azure integration is configured and working' : 
+        'Azure integration is running in mock mode - configure credentials for real deployments'
+    });
+    
+  } catch (error) {
+    console.error('❌ Azure test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Azure test failed',
+      details: error.message
+    });
+  }
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.status(200).json({

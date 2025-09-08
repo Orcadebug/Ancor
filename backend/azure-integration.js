@@ -16,37 +16,86 @@ class AzureService {
     this.storageAccountName = process.env.AZURE_STORAGE_ACCOUNT;
     this.storageAccountKey = process.env.AZURE_STORAGE_KEY;
     
+    // Log Azure configuration status
+    console.log('🔧 Azure Configuration Check:');
+    console.log(`   Subscription ID: ${this.subscriptionId ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   Resource Group: ${this.resourceGroupName}`);
+    console.log(`   Location: ${this.location}`);
+    console.log(`   Client ID: ${process.env.AZURE_CLIENT_ID ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   Client Secret: ${process.env.AZURE_CLIENT_SECRET ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   Tenant ID: ${process.env.AZURE_TENANT_ID ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   Storage Account: ${this.storageAccountName ? '✅ Set' : '❌ Missing'}`);
+    console.log(`   Storage Key: ${this.storageAccountKey ? '✅ Set' : '❌ Missing'}`);
+    
+    // Check for placeholder values
+    const hasPlaceholders = [
+      this.subscriptionId?.includes('your-'),
+      process.env.AZURE_CLIENT_ID?.includes('your-'),
+      process.env.AZURE_CLIENT_SECRET?.includes('your-'),
+      process.env.AZURE_TENANT_ID?.includes('your-'),
+      this.storageAccountName?.includes('your-'),
+      this.storageAccountKey?.includes('your-')
+    ].some(Boolean);
+    
+    if (hasPlaceholders) {
+      console.log('⚠️ DETECTED PLACEHOLDER VALUES - Azure credentials need to be configured with real values');
+      console.log('📖 See AZURE_DEPLOYMENT_GUIDE.md for setup instructions');
+    }
+    
     // Initialize Azure credentials
-    if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET && process.env.AZURE_TENANT_ID) {
-      this.credential = new ClientSecretCredential(
-        process.env.AZURE_TENANT_ID,
-        process.env.AZURE_CLIENT_ID,
-        process.env.AZURE_CLIENT_SECRET
-      );
-      console.log('✅ Azure service principal authentication configured');
+    if (process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET && process.env.AZURE_TENANT_ID && 
+        !process.env.AZURE_CLIENT_ID.includes('your-')) {
+      try {
+        this.credential = new ClientSecretCredential(
+          process.env.AZURE_TENANT_ID,
+          process.env.AZURE_CLIENT_ID,
+          process.env.AZURE_CLIENT_SECRET
+        );
+        console.log('✅ Azure service principal authentication configured');
+      } catch (error) {
+        console.error('❌ Failed to create Azure credentials:', error.message);
+      }
     } else {
-      console.log('⚠️ Azure credentials not found, using mock deployments');
+      console.log('⚠️ Azure credentials not found or contain placeholders, using mock deployments');
     }
     
     // Initialize Container Instance client
-    if (this.credential && this.subscriptionId) {
-      this.containerClient = new ContainerInstanceManagementClient(
-        this.credential,
-        this.subscriptionId
-      );
+    if (this.credential && this.subscriptionId && !this.subscriptionId.includes('your-')) {
+      try {
+        this.containerClient = new ContainerInstanceManagementClient(
+          this.credential,
+          this.subscriptionId
+        );
+        console.log('✅ Azure Container Instance client initialized');
+      } catch (error) {
+        console.error('❌ Failed to create Container Instance client:', error.message);
+      }
     }
     
     // Initialize storage client
-    if (this.storageAccountName && this.storageAccountKey) {
-      const sharedKeyCredential = new StorageSharedKeyCredential(
-        this.storageAccountName,
-        this.storageAccountKey
-      );
-      
-      this.blobServiceClient = new BlobServiceClient(
-        `https://${this.storageAccountName}.blob.core.windows.net`,
-        sharedKeyCredential
-      );
+    if (this.storageAccountName && this.storageAccountKey && 
+        !this.storageAccountName.includes('your-') && !this.storageAccountKey.includes('your-')) {
+      try {
+        const sharedKeyCredential = new StorageSharedKeyCredential(
+          this.storageAccountName,
+          this.storageAccountKey
+        );
+        
+        this.blobServiceClient = new BlobServiceClient(
+          `https://${this.storageAccountName}.blob.core.windows.net`,
+          sharedKeyCredential
+        );
+        console.log('✅ Azure Blob Storage client initialized');
+      } catch (error) {
+        console.error('❌ Failed to create Blob Storage client:', error.message);
+      }
+    }
+    
+    // Final status
+    if (this.containerClient) {
+      console.log('🚀 Azure integration ready for REAL deployments');
+    } else {
+      console.log('🎭 Azure integration running in MOCK mode');
     }
   }
 
@@ -386,6 +435,50 @@ class AzureService {
    */
   async deleteDeployment(deploymentId) {
     return this.stopDeployment(deploymentId);
+  }
+
+  /**
+   * Test Azure connectivity
+   */
+  async testAzureConnection() {
+    const results = {
+      containerClient: false,
+      storageClient: false,
+      resourceGroup: false,
+      errors: []
+    };
+    
+    try {
+      // Test Container Instance client
+      if (this.containerClient) {
+        console.log('🧪 Testing Azure Container Instance connectivity...');
+        await this.containerClient.containerGroups.list(this.resourceGroupName);
+        results.containerClient = true;
+        console.log('✅ Container Instance client working');
+      } else {
+        results.errors.push('Container Instance client not initialized');
+      }
+    } catch (error) {
+      results.errors.push(`Container Instance error: ${error.message}`);
+      console.error('❌ Container Instance test failed:', error.message);
+    }
+    
+    try {
+      // Test Blob Storage client
+      if (this.blobServiceClient) {
+        console.log('🧪 Testing Azure Blob Storage connectivity...');
+        await this.blobServiceClient.listContainers().next();
+        results.storageClient = true;
+        console.log('✅ Blob Storage client working');
+      } else {
+        results.errors.push('Blob Storage client not initialized');
+      }
+    } catch (error) {
+      results.errors.push(`Blob Storage error: ${error.message}`);
+      console.error('❌ Blob Storage test failed:', error.message);
+    }
+    
+    return results;
   }
 
   /**
