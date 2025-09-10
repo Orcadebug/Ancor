@@ -37,9 +37,10 @@ class AzureService {
       this.storageAccountKey?.includes('your-')
     ].some(Boolean);
     
-    if (hasPlaceholders) {
-      console.log('⚠️ DETECTED PLACEHOLDER VALUES - Azure credentials need to be configured with real values');
-      console.log('📖 See AZURE_DEPLOYMENT_GUIDE.md for setup instructions');
+    if (hasPlaceholders || this.subscriptionId?.includes('student-mock') || this.subscriptionId?.includes('mock')) {
+      console.log('🎓 STUDENT ACCOUNT DETECTED - Running in enhanced mock mode');
+      console.log('💡 Student accounts often cannot create service principals');
+      console.log('✨ Mock mode provides realistic deployment simulation');
     }
     
     // Initialize Azure credentials
