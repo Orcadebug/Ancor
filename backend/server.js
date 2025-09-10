@@ -89,32 +89,33 @@ app.get('/api/test-auth', authenticateSupabaseUser, (req, res) => {
   });
 });
 
-// Test Azure connectivity endpoint
-app.get('/api/test-azure', async (req, res) => {
+// Test GCP connectivity endpoint
+app.get('/api/test-gcp', async (req, res) => {
   try {
-    console.log('🧪 Azure connectivity test requested');
+    console.log('🧪 GCP connectivity test requested');
     
-    const testResults = await azureService.testAzureConnection();
+    const healthCheck = await gcpService.healthCheck();
     
     res.json({
       success: true,
-      azure: {
-        configured: !!azureService.containerClient,
-        containerClient: testResults.containerClient,
-        storageClient: testResults.storageClient,
-        errors: testResults.errors,
-        mode: azureService.containerClient ? 'REAL' : 'MOCK'
+      gcp: {
+        status: healthCheck.status,
+        mode: healthCheck.mode,
+        projectId: healthCheck.projectId,
+        region: healthCheck.region,
+        timestamp: healthCheck.timestamp,
+        error: healthCheck.error
       },
-      message: azureService.containerClient ? 
-        'Azure integration is configured and working' : 
-        'Azure integration is running in mock mode - configure credentials for real deployments'
+      message: healthCheck.status === 'healthy' ? 
+        `GCP integration is ${healthCheck.mode === 'production' ? 'configured and working' : 'running in mock mode'}` : 
+        'GCP integration has issues - check configuration'
     });
     
   } catch (error) {
-    console.error('❌ Azure test failed:', error);
+    console.error('❌ GCP test failed:', error);
     res.status(500).json({
       success: false,
-      error: 'Azure test failed',
+      error: 'GCP test failed',
       details: error.message
     });
   }
@@ -134,13 +135,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// Azure Integration
-const { AzureService } = require('./azure-integration');
+// GCP Integration - Production Ready
+const GCPService = require('./gcp-integration');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Initialize Azure service
-const azureService = new AzureService();
+// Initialize GCP service
+const gcpService = new GCPService();
 
 // In-memory storage for demo purposes (replace with database in production)
 const deployments = new Map();
@@ -305,8 +306,8 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
       });
     }
     
-    // Start real Azure deployment (async)
-    azureService.createDeployment({
+    // Start GCP deployment (production ready)
+    gcpService.createDeployment({
       deploymentId,
       name,
       industry,
@@ -383,21 +384,21 @@ app.get('/api/deployments/:id', authenticateSupabaseUser, async (req, res) => {
     // Get real-time status from Azure
     if (deployment.status === 'deploying' || deployment.status === 'active') {
       try {
-        const azureStatus = await azureService.getDeploymentStatus(deploymentId);
+        const gcpStatus = await gcpService.getDeploymentStatus(deploymentId);
         
         // Update status in Supabase if changed
-        if (azureStatus.status !== deployment.status) {
+        if (gcpStatus.status !== deployment.status) {
           const { error: updateError } = await supabase
             .from('deployments')
             .update({
-              status: azureStatus.status,
-              endpoint_url: azureStatus.apiUrl
+              status: gcpStatus.status,
+              endpoint_url: gcpStatus.apiUrl
             })
             .eq('id', deploymentId);
           
           if (!updateError) {
-            deployment.status = azureStatus.status;
-            deployment.endpoint_url = azureStatus.apiUrl;
+            deployment.status = gcpStatus.status;
+            deployment.endpoint_url = gcpStatus.apiUrl;
           }
         }
       } catch (error) {
@@ -465,8 +466,8 @@ app.delete('/api/deployments/:id', authenticateSupabaseUser, async (req, res) =>
       });
     }
     
-    // Stop Azure deployment (async)
-    azureService.stopDeployment(deploymentId, deployment.configuration?.azureDeploymentId)
+    // Stop GCP deployment (async)
+    gcpService.stopDeployment(deploymentId)
       .then(async () => {
         // Update to terminated status
         await supabase
@@ -523,8 +524,8 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     
     console.log('📄 Uploading document to Azure:', file.originalname);
     
-    // Upload to Azure Blob Storage
-    const uploadResult = await azureService.uploadDocument(deploymentId, file);
+    // Upload to GCP Cloud Storage
+    const uploadResult = await gcpService.uploadDocument(deploymentId, file);
     
     // Extract text (simple implementation)
     let extractedText = '';
