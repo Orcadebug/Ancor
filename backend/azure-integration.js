@@ -542,4 +542,4 @@ class AzureService {
   }
 }
 
-module.exports = { AzureService };
+module.exports = AzureService;
