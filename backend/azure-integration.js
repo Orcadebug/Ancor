@@ -122,6 +122,12 @@ class AzureService {
       
       console.log(`✅ Deployment created: ${apiUrl}`);
       
+      // For mock deployments, schedule automatic status transition
+      if (containerGroup.isMock) {
+        console.log('🎭 Mock deployment detected - scheduling status transition');
+        this.scheduleMockStatusUpdate(deploymentId);
+      }
+      
       return {
         deploymentId,
         status: 'deploying',
@@ -352,6 +358,45 @@ class AzureService {
         timestamp: new Date().toISOString()
       };
     }
+  }
+
+  /**
+   * Schedule mock deployment status update (for demo purposes)
+   */
+  scheduleMockStatusUpdate(deploymentId) {
+    // Simulate deployment time (10-30 seconds)
+    const deploymentTime = Math.random() * 20000 + 10000; // 10-30 seconds
+    
+    setTimeout(async () => {
+      try {
+        console.log(`🎭 Updating mock deployment status: ${deploymentId}`);
+        
+        // Import supabase here to avoid circular dependency
+        const { createClient } = require('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_ANON_KEY
+        );
+        
+        // Update deployment status to active
+        const { error } = await supabase
+          .from('deployments')
+          .update({
+            status: 'active',
+            endpoint_url: `http://mock-api-${deploymentId}.azurecontainer.io:8000`
+          })
+          .eq('id', deploymentId);
+        
+        if (error) {
+          console.error('❌ Failed to update mock deployment status:', error);
+        } else {
+          console.log(`✅ Mock deployment ${deploymentId} is now active`);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error in mock status update:', error);
+      }
+    }, deploymentTime);
   }
 
   /**
