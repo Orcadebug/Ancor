@@ -14,8 +14,14 @@ class RealGCPDeployment {
     this.region = process.env.GCP_REGION || 'us-central1';
     this.keyFilename = process.env.GCP_KEY_FILE;
     this.serviceAccountEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL;
+    this.isReady = false;
+    this.initializationError = null;
     
-    this.initializeClients();
+    // Initialize clients asynchronously to prevent blocking
+    this.initializeClients().catch(error => {
+      console.warn('⚠️ GCP initialization failed:', error.message);
+      this.initializationError = error;
+    });
   }
 
   async initializeClients() {
@@ -47,9 +53,11 @@ class RealGCPDeployment {
       });
 
       console.log('✅ Real GCP deployment clients initialized');
+      this.isReady = true;
       
     } catch (error) {
       console.error('❌ Real GCP deployment initialization failed:', error);
+      this.initializationError = error;
       throw error;
     }
   }

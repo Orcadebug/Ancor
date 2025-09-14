@@ -318,7 +318,7 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
     // Start REAL GCP AI Infrastructure deployment
     console.log('🏗️ Starting REAL AI Infrastructure deployment...');
     
-    if (!realGCPDeployment) {
+    if (!realGCPDeployment || !realGCPDeployment.isReady) {
       console.warn('⚠️ GCP deployment service not available - using mock deployment');
       // Update deployment status to show it's in mock mode
       await supabase
@@ -329,7 +329,7 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
           configuration: {
             ...deployment.configuration,
             mockMode: true,
-            error_message: 'GCP credentials not configured - running in mock mode'
+            error_message: realGCPDeployment?.initializationError?.message || 'GCP credentials not configured - running in mock mode'
           }
         })
         .eq('id', dbDeploymentId);
