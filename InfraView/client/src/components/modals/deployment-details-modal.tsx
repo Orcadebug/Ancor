@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, ExternalLink } from "lucide-react";
@@ -49,11 +49,15 @@ export function DeploymentDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
+      <DialogContent aria-describedby="deployment-details-description" className="max-w-2xl max-h-screen overflow-y-auto">
+        <p id="deployment-details-description" className="sr-only">Deployment details modal</p>
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-gray-900">
             Deployment Details
           </DialogTitle>
+          <DialogDescription>
+            View and manage your AI infrastructure deployment configuration and status.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">
