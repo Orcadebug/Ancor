@@ -26,19 +26,35 @@ class RealGCPDeployment {
 
   async initializeClients() {
     try {
+      console.log('🔧 GCP Initialization Debug:');
+      console.log(`   Project ID: ${this.projectId ? '✅ Set' : '❌ Missing'}`);
+      console.log(`   Service Account: ${this.serviceAccountEmail ? '✅ Set' : '❌ Missing'}`);
+      console.log(`   Key File: ${this.keyFilename ? '✅ Set' : '❌ Missing'}`);
+      console.log(`   Key Type: ${this.keyFilename?.startsWith('{') ? 'JSON Content' : 'File Path'}`);
+      
       if (!this.projectId) {
         throw new Error('GCP_PROJECT_ID is required for real deployments');
       }
 
-      this.auth = new GoogleAuth({
+      // Handle both keyFilename and direct JSON key content
+      const authOptions = {
         projectId: this.projectId,
-        keyFilename: this.keyFilename,
         scopes: [
           'https://www.googleapis.com/auth/cloud-platform',
           'https://www.googleapis.com/auth/compute',
           'https://www.googleapis.com/auth/run.admin'
         ]
-      });
+      };
+
+      if (this.keyFilename && this.keyFilename.startsWith('{')) {
+        // Direct JSON key content
+        authOptions.credentials = JSON.parse(this.keyFilename);
+      } else if (this.keyFilename) {
+        // File path
+        authOptions.keyFilename = this.keyFilename;
+      }
+
+      this.auth = new GoogleAuth(authOptions);
 
       const authClient = await this.auth.getClient();
       
