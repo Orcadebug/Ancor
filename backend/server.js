@@ -143,7 +143,14 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Initialize GCP services
 const gcpService = new GCPService();
-const realGCPDeployment = new RealGCPDeployment();
+let realGCPDeployment;
+
+try {
+  realGCPDeployment = new RealGCPDeployment();
+} catch (error) {
+  console.warn('⚠️ GCP deployment service not available:', error.message);
+  realGCPDeployment = null;
+}
 
 // In-memory storage for demo purposes (replace with database in production)
 const deployments = new Map();
@@ -310,6 +317,30 @@ app.post('/api/deployments', authenticateSupabaseUser, async (req, res) => {
     
     // Start REAL GCP AI Infrastructure deployment
     console.log('🏗️ Starting REAL AI Infrastructure deployment...');
+    
+    if (!realGCPDeployment) {
+      console.warn('⚠️ GCP deployment service not available - using mock deployment');
+      // Update deployment status to show it's in mock mode
+      await supabase
+        .from('deployments')
+        .update({
+          status: 'active',
+          endpoint_url: `https://mock-ai-${deploymentId}.example.com`,
+          configuration: {
+            ...deployment.configuration,
+            mockMode: true,
+            error_message: 'GCP credentials not configured - running in mock mode'
+          }
+        })
+        .eq('id', dbDeploymentId);
+      
+      res.json({
+        success: true,
+        deployment,
+        message: 'Mock deployment created! Please configure GCP credentials for real deployments.'
+      });
+      return;
+    }
     
     realGCPDeployment.deployAIInfrastructure({
       deploymentId,
