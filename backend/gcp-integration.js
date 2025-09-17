@@ -6,6 +6,8 @@
 const { Storage } = require('@google-cloud/storage');
 const { ServicesClient } = require('@google-cloud/run');
 const { GoogleAuth } = require('google-auth-library');
+const fs = require('fs');
+const path = require('path');
 
 class GCPService {
   constructor() {
@@ -49,15 +51,15 @@ class GCPService {
 
       // Handle JSON content, base64 encoded, or file path for credentials
       if (this.keyFilename) {
+        let credentialsJson;
         if (this.keyFilename.startsWith('{')) {
           // Direct JSON content
-          authOptions.credentials = JSON.parse(this.keyFilename);
+          credentialsJson = this.keyFilename;
           console.log('   Using JSON credentials from environment variable');
         } else if (this.keyFilename.startsWith('eyJ') || this.keyFilename.length > 1000) {
           // Base64 encoded JSON content
           try {
-            const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
-            authOptions.credentials = JSON.parse(decodedJson);
+            credentialsJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
             console.log('   Using base64 encoded credentials from environment variable');
           } catch (error) {
             console.log('   Using credentials from file path (base64 decode failed)');
@@ -67,6 +69,20 @@ class GCPService {
           // File path
           authOptions.keyFilename = this.keyFilename;
           console.log('   Using credentials from file path');
+        }
+
+        // Write credentials to temporary file for Railway compatibility
+        if (credentialsJson) {
+          try {
+            const credentials = JSON.parse(credentialsJson); // Validate parsing
+            const tempKeyPath = path.join(process.cwd(), 'temp-gcp-key.json');
+            fs.writeFileSync(tempKeyPath, credentialsJson);
+            authOptions.keyFilename = tempKeyPath;
+            console.log('   Wrote credentials to temporary file for authentication');
+          } catch (error) {
+            console.error('❌ Failed to process credentials:', error.message);
+            throw new Error('Invalid credentials format');
+          }
         }
       }
       
@@ -88,6 +104,16 @@ class GCPService {
         projectId: this.projectId,
         authClient
       });
+
+      // Clean up temporary key file if it was created
+      if (this.keyFilename && authOptions.keyFilename && authOptions.keyFilename.includes('temp-gcp-key.json')) {
+        try {
+          fs.unlinkSync(authOptions.keyFilename);
+          console.log('   Cleaned up temporary credentials file');
+        } catch (error) {
+          console.warn('   Warning: Could not clean up temporary file:', error.message);
+        }
+      }
 
       // Test authentication
       await this.testAuthentication();

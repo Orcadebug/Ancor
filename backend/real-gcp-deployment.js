@@ -7,6 +7,8 @@ const { Storage } = require('@google-cloud/storage');
 const { ServicesClient } = require('@google-cloud/run');
 const { GoogleAuth } = require('google-auth-library');
 const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 class RealGCPDeployment {
   constructor() {
@@ -49,8 +51,13 @@ class RealGCPDeployment {
       if (this.keyFilename) {
         try {
           const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
-          authOptions.credentials = JSON.parse(decodedJson);
-          console.log('   Using base64 encoded credentials from environment variable');
+          const credentials = JSON.parse(decodedJson); // Validate parsing
+          
+          // Write to temporary file for Railway compatibility
+          const tempKeyPath = path.join(process.cwd(), 'temp-gcp-key.json');
+          fs.writeFileSync(tempKeyPath, decodedJson);
+          authOptions.keyFilename = tempKeyPath;
+          console.log('   Using base64 encoded credentials from environment variable (written to temp file)');
         } catch (error) {
           console.error('❌ Failed to decode base64 credentials:', error.message);
           throw new Error('Invalid GCP_KEY_FILE_BASE64 format');
@@ -76,6 +83,16 @@ class RealGCPDeployment {
         projectId: this.projectId,
         authClient
       });
+
+      // Clean up temporary key file if it was created
+      if (this.keyFilename && authOptions.keyFilename && authOptions.keyFilename.includes('temp-gcp-key.json')) {
+        try {
+          fs.unlinkSync(authOptions.keyFilename);
+          console.log('   Cleaned up temporary credentials file');
+        } catch (error) {
+          console.warn('   Warning: Could not clean up temporary file:', error.message);
+        }
+      }
 
       console.log('✅ Real GCP deployment clients initialized');
       this.isReady = true;
