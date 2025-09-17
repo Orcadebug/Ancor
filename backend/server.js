@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 console.log('🔄 Starting AI Infrastructure Platform API...');
+// Triggering redeploy to refresh environment variables
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -175,6 +176,7 @@ const RealGCPDeployment = require('./real-gcp-deployment');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
+// Trigger redeploy for GCP base64 fix
 // Initialize GCP services
 // Check for base64 encoded credentials first
 if (process.env.GCP_KEY_FILE_BASE64) {
