@@ -97,14 +97,15 @@ app.get('/api/debug-env', (req, res) => {
   const envInfo = {
     GCP_PROJECT_ID: process.env.GCP_PROJECT_ID ? '✅ Set' : '❌ Missing',
     GCP_SERVICE_ACCOUNT_EMAIL: process.env.GCP_SERVICE_ACCOUNT_EMAIL ? '✅ Set' : '❌ Missing',
-    GCP_KEY_FILE: process.env.GCP_KEY_FILE ? '✅ Set (' + process.env.GCP_KEY_FILE.length + ' chars)' : '❌ Missing',
+    GCP_KEY_FILE_BASE64: process.env.GCP_KEY_FILE_BASE64 ? '✅ Set (' + process.env.GCP_KEY_FILE_BASE64.length + ' chars)' : '❌ Missing',
     GCP_REGION: process.env.GCP_REGION || 'us-central1'
   };
   
   let keyDetails = null;
-  if (process.env.GCP_KEY_FILE) {
+  if (process.env.GCP_KEY_FILE_BASE64) {
     try {
-      const keyData = JSON.parse(process.env.GCP_KEY_FILE);
+      const decodedJson = Buffer.from(process.env.GCP_KEY_FILE_BASE64, 'base64').toString('utf8');
+      const keyData = JSON.parse(decodedJson);
       keyDetails = {
         project_id: keyData.project_id,
         client_email: keyData.client_email,
@@ -178,11 +179,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Trigger redeploy for GCP base64 fix
 // Initialize GCP services
-// Check for base64 encoded credentials first
-if (process.env.GCP_KEY_FILE_BASE64) {
-  process.env.GCP_KEY_FILE = process.env.GCP_KEY_FILE_BASE64;
-  console.log('🔧 Using base64 encoded GCP credentials');
-}
+// Using GCP_KEY_FILE_BASE64 directly in GCP service
 
 const gcpService = new GCPService();
 let realGCPDeployment;
