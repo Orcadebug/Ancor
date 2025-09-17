@@ -12,25 +12,25 @@
     "lint": "echo 'Linting skipped'"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
+    "@google-cloud/run": "^2.3.0",
     "@google-cloud/storage": "^7.12.1",
-    "@google-cloud/run": "^3.0.0",
-    "google-auth-library": "^9.13.0",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.11.0",
-    "multer": "^1.4.5-lts.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.15.1",
     "http-proxy-middleware": "^2.0.6",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.2"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
-    "@types/node": "^22.7.4",
-    "@types/jsonwebtoken": "^9.0.10"
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.7.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }
