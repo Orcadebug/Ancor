@@ -12,7 +12,7 @@ class RealGCPDeployment {
   constructor() {
     this.projectId = process.env.GCP_PROJECT_ID;
     this.region = process.env.GCP_REGION || 'us-central1';
-    this.keyFilename = process.env.GCP_KEY_FILE;
+    this.keyFilename = process.env.GCP_KEY_FILE_BASE64;
     this.serviceAccountEmail = process.env.GCP_SERVICE_ACCOUNT_EMAIL;
     this.isReady = false;
     this.initializationError = null;
