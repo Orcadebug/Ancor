@@ -176,6 +176,12 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Initialize GCP services
+// Check for base64 encoded credentials first
+if (process.env.GCP_KEY_FILE_BASE64) {
+  process.env.GCP_KEY_FILE = process.env.GCP_KEY_FILE_BASE64;
+  console.log('🔧 Using base64 encoded GCP credentials');
+}
+
 const gcpService = new GCPService();
 let realGCPDeployment;
 

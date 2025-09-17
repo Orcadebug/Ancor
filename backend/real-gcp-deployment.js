@@ -51,6 +51,16 @@ class RealGCPDeployment {
           // Direct JSON key content
           authOptions.credentials = JSON.parse(this.keyFilename);
           console.log('   Using JSON credentials from environment variable');
+        } else if (this.keyFilename.startsWith('eyJ') || this.keyFilename.length > 1000) {
+          // Base64 encoded JSON content
+          try {
+            const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
+            authOptions.credentials = JSON.parse(decodedJson);
+            console.log('   Using base64 encoded credentials from environment variable');
+          } catch (error) {
+            console.log('   Using credentials from file path (base64 decode failed)');
+            authOptions.keyFilename = this.keyFilename;
+          }
         } else {
           // File path
           authOptions.keyFilename = this.keyFilename;
