@@ -89,6 +89,40 @@ app.get('/api/test-auth', authenticateSupabaseUser, (req, res) => {
   });
 });
 
+// Debug environment variables endpoint
+app.get('/api/debug-env', (req, res) => {
+  console.log('🔍 Environment debug requested');
+  
+  const envInfo = {
+    GCP_PROJECT_ID: process.env.GCP_PROJECT_ID ? '✅ Set' : '❌ Missing',
+    GCP_SERVICE_ACCOUNT_EMAIL: process.env.GCP_SERVICE_ACCOUNT_EMAIL ? '✅ Set' : '❌ Missing',
+    GCP_KEY_FILE: process.env.GCP_KEY_FILE ? '✅ Set (' + process.env.GCP_KEY_FILE.length + ' chars)' : '❌ Missing',
+    GCP_REGION: process.env.GCP_REGION || 'us-central1'
+  };
+  
+  let keyDetails = null;
+  if (process.env.GCP_KEY_FILE) {
+    try {
+      const keyData = JSON.parse(process.env.GCP_KEY_FILE);
+      keyDetails = {
+        project_id: keyData.project_id,
+        client_email: keyData.client_email,
+        type: keyData.type,
+        has_private_key: !!keyData.private_key
+      };
+    } catch (error) {
+      keyDetails = { error: 'Invalid JSON: ' + error.message };
+    }
+  }
+  
+  res.json({
+    success: true,
+    environment: envInfo,
+    keyDetails,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Test GCP connectivity endpoint
 app.get('/api/test-gcp', async (req, res) => {
   try {

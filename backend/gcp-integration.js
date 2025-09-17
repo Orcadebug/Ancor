@@ -38,23 +38,33 @@ class GCPService {
       }
 
       // Initialize authentication
-      const authOptions = {};
-      if (this.keyFilename) {
-        authOptions.keyFilename = this.keyFilename;
-      }
-      if (this.serviceAccountEmail) {
-        authOptions.clientEmail = this.serviceAccountEmail;
-      }
-
-      this.auth = new GoogleAuth({
+      const authOptions = {
         projectId: this.projectId,
         scopes: [
           'https://www.googleapis.com/auth/cloud-platform',
           'https://www.googleapis.com/auth/run.admin',
           'https://www.googleapis.com/auth/devstorage.full_control'
-        ],
-        ...authOptions
-      });
+        ]
+      };
+
+      // Handle both JSON content and file path for credentials
+      if (this.keyFilename) {
+        if (this.keyFilename.startsWith('{')) {
+          // Direct JSON content
+          authOptions.credentials = JSON.parse(this.keyFilename);
+          console.log('   Using JSON credentials from environment variable');
+        } else {
+          // File path
+          authOptions.keyFilename = this.keyFilename;
+          console.log('   Using credentials from file path');
+        }
+      }
+      
+      if (this.serviceAccountEmail) {
+        authOptions.clientEmail = this.serviceAccountEmail;
+      }
+
+      this.auth = new GoogleAuth(authOptions);
 
       // Initialize GCP clients with authentication
       const authClient = await this.auth.getClient();

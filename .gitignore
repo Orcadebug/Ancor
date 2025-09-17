@@ -143,6 +143,12 @@ gcp-credentials.json
 aws-credentials.json
 coreweave-credentials.json
 
+# GCP Service Account Keys
+*service-account*.json
+ai-infrastructure-platform-*.json
+gcp-service-account-key.json
+service-account-key.json
+
 # Database dumps
 *.sql.gz
 *.dump

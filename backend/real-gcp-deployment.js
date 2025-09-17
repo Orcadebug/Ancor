@@ -46,12 +46,16 @@ class RealGCPDeployment {
         ]
       };
 
-      if (this.keyFilename && this.keyFilename.startsWith('{')) {
-        // Direct JSON key content
-        authOptions.credentials = JSON.parse(this.keyFilename);
-      } else if (this.keyFilename) {
-        // File path
-        authOptions.keyFilename = this.keyFilename;
+      if (this.keyFilename) {
+        if (this.keyFilename.startsWith('{')) {
+          // Direct JSON key content
+          authOptions.credentials = JSON.parse(this.keyFilename);
+          console.log('   Using JSON credentials from environment variable');
+        } else {
+          // File path
+          authOptions.keyFilename = this.keyFilename;
+          console.log('   Using credentials from file path');
+        }
       }
 
       this.auth = new GoogleAuth(authOptions);
