@@ -104,15 +104,23 @@ class GCPService {
 
   async testAuthentication() {
     try {
+      console.log('🧪 Testing GCP authentication...');
+      
       // Test Cloud Run access
       const parent = `projects/${this.projectId}/locations/${this.region}`;
+      console.log(`   Testing Cloud Run access with parent: ${parent}`);
       await this.cloudRun.listServices({ parent });
+      console.log('   ✅ Cloud Run access successful');
       
       // Test Storage access
+      console.log('   Testing Storage access...');
       await this.storage.getBuckets();
+      console.log('   ✅ Storage access successful');
       
       console.log('✅ GCP authentication verified');
     } catch (error) {
+      console.error('❌ GCP authentication test failed:', error.message);
+      console.error('   Full error details:', error);
       throw new Error(`GCP authentication failed: ${error.message}`);
     }
   }
