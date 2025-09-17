@@ -42,8 +42,8 @@ async function testGCPAuth() {
     console.log('✅ GCP Authentication successful!');
     
     // Test Cloud Run access
-    const { CloudRunServiceClient } = require('@google-cloud/run');
-    const cloudRun = new CloudRunServiceClient({
+    const { ServicesClient } = require('@google-cloud/run');
+    const cloudRun = new ServicesClient({
       projectId: process.env.GCP_PROJECT_ID,
       authClient
     });

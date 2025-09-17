@@ -8,7 +8,7 @@ require('dotenv').config();
 
 const { GoogleAuth } = require('google-auth-library');
 const { Storage } = require('@google-cloud/storage');
-const { CloudRunServiceClient } = require('@google-cloud/run');
+const { ServicesClient } = require('@google-cloud/run');
 
 async function testGCPCredentials() {
   console.log('🧪 Testing GCP Credentials...\n');
@@ -84,7 +84,7 @@ async function testGCPCredentials() {
     // Test basic Cloud Run access (simplified)
     console.log('☁️ Testing Cloud Run access...');
     try {
-      const cloudRun = new CloudRunServiceClient({
+      const cloudRun = new ServicesClient({
         projectId: projectId,
         authClient
       });
