@@ -4,7 +4,7 @@
  */
 
 const { Storage } = require('@google-cloud/storage');
-const { CloudRunServiceClient } = require('@google-cloud/run');
+const { ServicesClient } = require('@google-cloud/run');
 const { GoogleAuth } = require('google-auth-library');
 
 class GCPService {
@@ -84,7 +84,7 @@ class GCPService {
         authClient
       });
       
-      this.cloudRun = new CloudRunServiceClient({
+      this.cloudRun = new ServicesClient({
         projectId: this.projectId,
         authClient
       });

@@ -4,7 +4,7 @@
  */
 
 const { Storage } = require('@google-cloud/storage');
-const { CloudRunServiceClient } = require('@google-cloud/run');
+const { ServicesClient } = require('@google-cloud/run');
 const { GoogleAuth } = require('google-auth-library');
 const { execSync } = require('child_process');
 
@@ -26,46 +26,41 @@ class RealGCPDeployment {
 
   async initializeClients() {
     try {
-      console.log('🔧 GCP Initialization Debug:');
+      console.log('🔧 GCP Production Configuration:');
       console.log(`   Project ID: ${this.projectId ? '✅ Set' : '❌ Missing'}`);
-      console.log(`   Service Account: ${this.serviceAccountEmail ? '✅ Set' : '❌ Missing'}`);
+      console.log(`   Region: ${this.region}`);
+      console.log(`   Service Account: ${this.serviceAccountEmail ? '✅ Set' : '❌ Using default'}`);
       console.log(`   Key File: ${this.keyFilename ? '✅ Set' : '❌ Missing'}`);
-      console.log(`   Key Type: ${this.keyFilename?.startsWith('{') ? 'JSON Content' : 'File Path'}`);
       
       if (!this.projectId) {
-        throw new Error('GCP_PROJECT_ID is required for real deployments');
+        throw new Error('GCP_PROJECT_ID is required');
       }
 
-      // Handle both keyFilename and direct JSON key content
       const authOptions = {
         projectId: this.projectId,
         scopes: [
           'https://www.googleapis.com/auth/cloud-platform',
-          'https://www.googleapis.com/auth/compute',
-          'https://www.googleapis.com/auth/run.admin'
+          'https://www.googleapis.com/auth/run.admin',
+          'https://www.googleapis.com/auth/devstorage.full_control'
         ]
       };
 
+      // Handle base64 encoded credentials
       if (this.keyFilename) {
-        if (this.keyFilename.startsWith('{')) {
-          // Direct JSON key content
-          authOptions.credentials = JSON.parse(this.keyFilename);
-          console.log('   Using JSON credentials from environment variable');
-        } else if (this.keyFilename.startsWith('eyJ') || this.keyFilename.length > 1000) {
-          // Base64 encoded JSON content
-          try {
-            const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
-            authOptions.credentials = JSON.parse(decodedJson);
-            console.log('   Using base64 encoded credentials from environment variable');
-          } catch (error) {
-            console.log('   Using credentials from file path (base64 decode failed)');
-            authOptions.keyFilename = this.keyFilename;
-          }
-        } else {
-          // File path
-          authOptions.keyFilename = this.keyFilename;
-          console.log('   Using credentials from file path');
+        try {
+          const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
+          authOptions.credentials = JSON.parse(decodedJson);
+          console.log('   Using base64 encoded credentials from environment variable');
+        } catch (error) {
+          console.error('❌ Failed to decode base64 credentials:', error.message);
+          throw new Error('Invalid GCP_KEY_FILE_BASE64 format');
         }
+      } else {
+        console.warn('⚠️ No GCP_KEY_FILE_BASE64 set - attempting default credentials');
+      }
+
+      if (this.serviceAccountEmail) {
+        authOptions.clientEmail = this.serviceAccountEmail;
       }
 
       this.auth = new GoogleAuth(authOptions);
@@ -77,7 +72,7 @@ class RealGCPDeployment {
         authClient
       });
       
-      this.cloudRun = new CloudRunServiceClient({
+      this.cloudRun = new ServicesClient({
         projectId: this.projectId,
         authClient
       });
