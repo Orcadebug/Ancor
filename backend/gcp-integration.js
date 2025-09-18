@@ -43,9 +43,7 @@ class GCPService {
       const authOptions = {
         projectId: this.projectId,
         scopes: [
-          'https://www.googleapis.com/auth/cloud-platform',
-          'https://www.googleapis.com/auth/run.admin',
-          'https://www.googleapis.com/auth/devstorage.full_control'
+          'https://www.googleapis.com/auth/cloud-platform'
         ]
       };
 
