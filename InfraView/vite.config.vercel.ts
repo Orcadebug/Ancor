@@ -15,8 +15,17 @@ export default defineConfig({
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      external: [],
+      output: {
+        manualChunks: undefined,
+      },
+    },
   },
   define: {
     'process.env.NODE_ENV': '"production"',
+  },
+  optimizeDeps: {
+    exclude: [],
   },
 });
