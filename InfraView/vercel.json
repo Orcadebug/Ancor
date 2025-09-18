@@ -2,7 +2,6 @@
   "buildCommand": "npm run build:vercel",
   "outputDirectory": "dist",
   "framework": "vite",
-  "nodeVersion": "20",
   "env": {
     "NODE_ENV": "production",
     "VITE_USE_MOCK_DATA": "false",
