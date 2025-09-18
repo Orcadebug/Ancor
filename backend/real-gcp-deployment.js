@@ -47,20 +47,30 @@ class RealGCPDeployment {
         ]
       };
 
-      // Handle base64 encoded credentials
+      // Handle base64 encoded credentials - use in-memory approach
       if (this.keyFilename) {
         try {
           const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
           const credentials = JSON.parse(decodedJson); // Validate parsing
           
-          // Write to temporary file for Railway compatibility
-          const tempKeyPath = path.join(process.cwd(), 'temp-gcp-key.json');
-          fs.writeFileSync(tempKeyPath, decodedJson);
-          authOptions.keyFilename = tempKeyPath;
-          console.log('   Using base64 encoded credentials from environment variable (written to temp file)');
+          // Validate required fields
+          if (!credentials.private_key || !credentials.client_email || !credentials.project_id) {
+            throw new Error('Invalid service account key: missing required fields');
+          }
+          
+          // Validate private key format
+          if (!credentials.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
+            throw new Error('Invalid private key format: not a valid PEM key');
+          }
+          
+          // Use in-memory credentials instead of temp file
+          authOptions.credentials = credentials;
+          console.log('   Using base64 encoded credentials from environment variable (in-memory)');
+          console.log(`   Service account: ${credentials.client_email}`);
+          console.log(`   Project ID: ${credentials.project_id}`);
         } catch (error) {
-          console.error('❌ Failed to decode base64 credentials:', error.message);
-          throw new Error('Invalid GCP_KEY_FILE_BASE64 format');
+          console.error('❌ Failed to decode/validate base64 credentials:', error.message);
+          throw new Error(`Invalid GCP_KEY_FILE_BASE64 format: ${error.message}`);
         }
       } else {
         console.warn('⚠️ No GCP_KEY_FILE_BASE64 set - attempting default credentials');
@@ -84,15 +94,7 @@ class RealGCPDeployment {
         authClient
       });
 
-      // Clean up temporary key file if it was created
-      if (this.keyFilename && authOptions.keyFilename && authOptions.keyFilename.includes('temp-gcp-key.json')) {
-        try {
-          fs.unlinkSync(authOptions.keyFilename);
-          console.log('   Cleaned up temporary credentials file');
-        } catch (error) {
-          console.warn('   Warning: Could not clean up temporary file:', error.message);
-        }
-      }
+      // No cleanup needed for in-memory credentials
 
       console.log('✅ Real GCP deployment clients initialized');
       this.isReady = true;

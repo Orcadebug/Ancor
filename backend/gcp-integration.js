@@ -51,38 +51,49 @@ class GCPService {
 
       // Handle JSON content, base64 encoded, or file path for credentials
       if (this.keyFilename) {
-        let credentialsJson;
+        let credentials;
+        
         if (this.keyFilename.startsWith('{')) {
           // Direct JSON content
-          credentialsJson = this.keyFilename;
-          console.log('   Using JSON credentials from environment variable');
+          try {
+            credentials = JSON.parse(this.keyFilename);
+            console.log('   Using JSON credentials from environment variable (in-memory)');
+          } catch (error) {
+            throw new Error(`Invalid JSON credentials: ${error.message}`);
+          }
         } else if (this.keyFilename.startsWith('eyJ') || this.keyFilename.length > 1000) {
           // Base64 encoded JSON content
           try {
-            credentialsJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
-            console.log('   Using base64 encoded credentials from environment variable');
+            const decodedJson = Buffer.from(this.keyFilename, 'base64').toString('utf8');
+            credentials = JSON.parse(decodedJson);
+            console.log('   Using base64 encoded credentials from environment variable (in-memory)');
           } catch (error) {
             console.log('   Using credentials from file path (base64 decode failed)');
             authOptions.keyFilename = this.keyFilename;
+            credentials = null;
           }
         } else {
           // File path
           authOptions.keyFilename = this.keyFilename;
           console.log('   Using credentials from file path');
+          credentials = null;
         }
 
-        // Write credentials to temporary file for Railway compatibility
-        if (credentialsJson) {
-          try {
-            const credentials = JSON.parse(credentialsJson); // Validate parsing
-            const tempKeyPath = path.join(process.cwd(), 'temp-gcp-key.json');
-            fs.writeFileSync(tempKeyPath, credentialsJson);
-            authOptions.keyFilename = tempKeyPath;
-            console.log('   Wrote credentials to temporary file for authentication');
-          } catch (error) {
-            console.error('❌ Failed to process credentials:', error.message);
-            throw new Error('Invalid credentials format');
+        // Use in-memory credentials if available
+        if (credentials) {
+          // Validate required fields
+          if (!credentials.private_key || !credentials.client_email || !credentials.project_id) {
+            throw new Error('Invalid service account key: missing required fields');
           }
+          
+          // Validate private key format
+          if (!credentials.private_key.includes('-----BEGIN PRIVATE KEY-----')) {
+            throw new Error('Invalid private key format: not a valid PEM key');
+          }
+          
+          authOptions.credentials = credentials;
+          console.log(`   Service account: ${credentials.client_email}`);
+          console.log(`   Project ID: ${credentials.project_id}`);
         }
       }
       
@@ -105,15 +116,7 @@ class GCPService {
         authClient
       });
 
-      // Clean up temporary key file if it was created
-      if (this.keyFilename && authOptions.keyFilename && authOptions.keyFilename.includes('temp-gcp-key.json')) {
-        try {
-          fs.unlinkSync(authOptions.keyFilename);
-          console.log('   Cleaned up temporary credentials file');
-        } catch (error) {
-          console.warn('   Warning: Could not clean up temporary file:', error.message);
-        }
-      }
+      // No cleanup needed for in-memory credentials
 
       // Test authentication with graceful error handling
       try {
@@ -138,15 +141,33 @@ class GCPService {
     try {
       console.log('🧪 Testing GCP authentication...');
       
-      // Test basic authentication with simpler API calls
+      // Test basic authentication with better error handling
       console.log('   Testing basic authentication...');
       const authClient = await this.auth.getClient();
-      const accessToken = await authClient.getAccessToken();
       
-      if (accessToken && accessToken.token) {
-        console.log('   ✅ Access token obtained successfully');
-      } else {
-        throw new Error('Failed to obtain access token');
+      try {
+        const accessToken = await authClient.getAccessToken();
+        
+        if (accessToken && accessToken.token) {
+          console.log('   ✅ Access token obtained successfully');
+          console.log(`   Token type: ${accessToken.token_type || 'Bearer'}`);
+          console.log(`   Expires in: ${accessToken.expires_in || 'unknown'} seconds`);
+        } else {
+          throw new Error('Access token response missing token field');
+        }
+      } catch (tokenError) {
+        console.error('   ❌ Token refresh failed:', tokenError.message);
+        
+        // Provide specific error guidance
+        if (tokenError.message.includes('Could not refresh access token')) {
+          console.error('   💡 This usually indicates:');
+          console.error('   - Invalid or corrupted service account key');
+          console.error('   - Missing required fields in credentials');
+          console.error('   - Clock skew or network issues');
+          console.error('   - Service account permissions');
+        }
+        
+        throw new Error(`Token refresh failed: ${tokenError.message}`);
       }
       
       // Test Storage access (REST-based, more reliable)
