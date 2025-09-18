@@ -32,6 +32,16 @@ class GCPService {
       console.log(`   Service Account: ${this.serviceAccountEmail ? '✅ Set' : '❌ Using default'}`);
       console.log(`   Key File: ${this.keyFilename ? '✅ Set' : '❌ Using default credentials'}`);
       
+      // Debug library versions to help with troubleshooting
+      try {
+        const gaxVersion = require('google-gax/package.json').version;
+        const authVersion = require('google-auth-library/package.json').version;
+        console.log(`   google-gax: v${gaxVersion}`);
+        console.log(`   google-auth-library: v${authVersion}`);
+      } catch (error) {
+        console.log('   Library versions: Could not determine');
+      }
+      
       // Validate required configuration
       if (!this.projectId) {
         console.warn('⚠️ GCP_PROJECT_ID not set - running in mock mode');
