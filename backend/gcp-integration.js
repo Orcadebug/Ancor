@@ -322,97 +322,80 @@ class GCPService {
     console.log(`🐳 Deploying production Cloud Run service: ${serviceName}`);
     
     const service = {
-      apiVersion: 'serving.knative.dev/v1',
-      kind: 'Service',
-      metadata: {
-        name: serviceName,
-        namespace: this.projectId,
+      labels: {
+        'app': 'ai-infrastructure',
+        'deployment-id': deploymentId,
+        'industry': industry,
+        'model': modelSize,
+        'environment': process.env.NODE_ENV || 'production'
+      },
+      annotations: {
+        'run.googleapis.com/ingress': 'all',
+        'run.googleapis.com/execution-environment': 'gen2',
+        'run.googleapis.com/cpu-throttling': 'false',
+        'run.googleapis.com/startup-cpu-boost': 'true'
+      },
+      template: {
         labels: {
-          'app': 'ai-infrastructure',
           'deployment-id': deploymentId,
-          'industry': industry,
-          'model': modelSize,
-          'environment': process.env.NODE_ENV || 'production'
+          'version': 'v1'
         },
         annotations: {
-          'run.googleapis.com/ingress': 'all',
-          'run.googleapis.com/execution-environment': 'gen2',
-          'run.googleapis.com/cpu-throttling': 'false',
-          'run.googleapis.com/startup-cpu-boost': 'true'
-        }
-      },
-      spec: {
-        template: {
-          metadata: {
-            labels: {
-              'deployment-id': deploymentId,
-              'version': 'v1'
-            },
-            annotations: {
-              'autoscaling.knative.dev/minScale': '1',
-              'autoscaling.knative.dev/maxScale': '100',
-              'run.googleapis.com/memory': `${containerConfig.memory}Gi`,
-              'run.googleapis.com/cpu': containerConfig.cpu,
-              'run.googleapis.com/timeout': '3600s', // 1 hour timeout
-              'run.googleapis.com/vpc-access-connector': process.env.GCP_VPC_CONNECTOR,
-              'run.googleapis.com/vpc-access-egress': 'private-ranges-only'
+          'autoscaling.knative.dev/minScale': '1',
+          'autoscaling.knative.dev/maxScale': '100',
+          'run.googleapis.com/memory': `${containerConfig.memory}Gi`,
+          'run.googleapis.com/cpu': containerConfig.cpu,
+          'run.googleapis.com/timeout': '3600s', // 1 hour timeout
+          'run.googleapis.com/vpc-access-connector': process.env.GCP_VPC_CONNECTOR,
+          'run.googleapis.com/vpc-access-egress': 'private-ranges-only'
+        },
+        scaling: {
+          minInstanceCount: 1,
+          maxInstanceCount: 100
+        },
+        timeout: '3600s',
+        serviceAccount: this.serviceAccountEmail,
+        containers: [{
+          image: containerConfig.image,
+          ports: [{ 
+            name: 'http1',
+            containerPort: 8000 
+          }],
+          env: [
+            { name: 'MODEL_NAME', value: containerConfig.modelName },
+            { name: 'PORT', value: '8000' },
+            { name: 'DEPLOYMENT_ID', value: deploymentId },
+            { name: 'INDUSTRY', value: industry },
+            { name: 'GCP_PROJECT_ID', value: this.projectId },
+            { name: 'STORAGE_BUCKET', value: `ai-deployment-${deploymentId}-${this.projectId}` },
+            { name: 'LOG_LEVEL', value: process.env.LOG_LEVEL || 'INFO' }
+          ],
+          resources: {
+            limits: {
+              cpu: containerConfig.cpu,
+              memory: `${containerConfig.memory}Gi`
             }
           },
-          spec: {
-            containerConcurrency: containerConfig.concurrency,
-            timeoutSeconds: 3600,
-            serviceAccountName: this.serviceAccountEmail,
-            containers: [{
-              image: containerConfig.image,
-              ports: [{ 
-                name: 'http1',
-                containerPort: 8000 
-              }],
-              env: [
-                { name: 'MODEL_NAME', value: containerConfig.modelName },
-                { name: 'PORT', value: '8000' },
-                { name: 'DEPLOYMENT_ID', value: deploymentId },
-                { name: 'INDUSTRY', value: industry },
-                { name: 'GCP_PROJECT_ID', value: this.projectId },
-                { name: 'STORAGE_BUCKET', value: `ai-deployment-${deploymentId}-${this.projectId}` },
-                { name: 'LOG_LEVEL', value: process.env.LOG_LEVEL || 'INFO' }
-              ],
-              resources: {
-                limits: {
-                  cpu: containerConfig.cpu,
-                  memory: `${containerConfig.memory}Gi`
-                },
-                requests: {
-                  cpu: containerConfig.cpuRequest,
-                  memory: `${containerConfig.memoryRequest}Gi`
-                }
-              },
-              livenessProbe: {
-                httpGet: {
-                  path: '/health',
-                  port: 8000
-                },
-                initialDelaySeconds: 60,
-                periodSeconds: 30,
-                timeoutSeconds: 10,
-                failureThreshold: 3
-              },
-              readinessProbe: {
-                httpGet: {
-                  path: '/ready',
-                  port: 8000
-                },
-                initialDelaySeconds: 30,
-                periodSeconds: 10,
-                timeoutSeconds: 5,
-                failureThreshold: 3
-              }
-            }]
+          startupProbe: {
+            httpGet: {
+              path: '/health',
+              port: 8000
+            },
+            initialDelaySeconds: 60,
+            periodSeconds: 30,
+            timeoutSeconds: 10,
+            failureThreshold: 3
+          },
+          livenessProbe: {
+            httpGet: {
+              path: '/ready',
+              port: 8000
+            },
+            initialDelaySeconds: 30,
+            periodSeconds: 10,
+            timeoutSeconds: 5,
+            failureThreshold: 3
           }
-        },
-        traffic: [{
-          percent: 100,
-          latestRevision: true
         }]
       }
     };

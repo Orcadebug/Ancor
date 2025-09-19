@@ -243,55 +243,51 @@ class RealGCPDeployment {
     const containerImage = this.getLLaMAContainerImage(modelSize);
     
     const service = {
-      apiVersion: 'serving.knative.dev/v1',
-      kind: 'Service',
-      metadata: {
-        name: serviceName,
+      labels: {
+        'deployment-id': deploymentId,
+        'component': 'ai-model',
+        'model': modelSize
+      },
+      annotations: {
+        'run.googleapis.com/execution-environment': 'gen2',
+        'run.googleapis.com/cpu-throttling': 'false',
+        'run.googleapis.com/startup-cpu-boost': 'true'
+      },
+      template: {
         labels: {
           'deployment-id': deploymentId,
-          'component': 'ai-model',
-          'model': modelSize
+          'component': 'ai-model'
         },
         annotations: {
-          'run.googleapis.com/execution-environment': 'gen2',
-          'run.googleapis.com/cpu-throttling': 'false',
-          'run.googleapis.com/startup-cpu-boost': 'true'
-        }
-      },
-      spec: {
-        template: {
-          metadata: {
-            annotations: {
-              'autoscaling.knative.dev/minScale': '1',
-              'autoscaling.knative.dev/maxScale': '10',
-              'run.googleapis.com/memory': '32Gi',
-              'run.googleapis.com/cpu': '8',
-              'run.googleapis.com/timeout': '3600s'
+          'autoscaling.knative.dev/minScale': '1',
+          'autoscaling.knative.dev/maxScale': '10',
+          'run.googleapis.com/memory': '32Gi',
+          'run.googleapis.com/cpu': '8',
+          'run.googleapis.com/timeout': '3600s'
+        },
+        scaling: {
+          minInstanceCount: 1,
+          maxInstanceCount: 10
+        },
+        containers: [{
+          image: containerImage,
+          ports: [{ containerPort: 8000 }],
+          env: [
+            { name: 'MODEL_NAME', value: this.getModelName(modelSize) },
+            { name: 'MAX_MODEL_LEN', value: '4096' },
+            { name: 'GPU_MEMORY_UTILIZATION', value: '0.9' },
+            { name: 'DEPLOYMENT_ID', value: deploymentId },
+            { name: 'STORAGE_BUCKET', value: infrastructure.bucketName },
+            { name: 'DATABASE_URL', value: infrastructure.databaseInstance.connectionString }
+          ],
+          resources: {
+            limits: {
+              'nvidia.com/gpu': '1', // Request GPU
+              cpu: '8',
+              memory: '32Gi'
             }
-          },
-          spec: {
-            containerConcurrency: 1, // One request at a time for large models
-            containers: [{
-              image: containerImage,
-              ports: [{ containerPort: 8000 }],
-              env: [
-                { name: 'MODEL_NAME', value: this.getModelName(modelSize) },
-                { name: 'MAX_MODEL_LEN', value: '4096' },
-                { name: 'GPU_MEMORY_UTILIZATION', value: '0.9' },
-                { name: 'DEPLOYMENT_ID', value: deploymentId },
-                { name: 'STORAGE_BUCKET', value: infrastructure.bucketName },
-                { name: 'DATABASE_URL', value: infrastructure.databaseInstance.connectionString }
-              ],
-              resources: {
-                limits: {
-                  'nvidia.com/gpu': '1', // Request GPU
-                  cpu: '8',
-                  memory: '32Gi'
-                }
-              }
-            }]
           }
-        }
+        }]
       }
     };
     
@@ -340,51 +336,48 @@ class RealGCPDeployment {
     const serviceName = `n8n-${deploymentId}`;
     
     const service = {
-      apiVersion: 'serving.knative.dev/v1',
-      kind: 'Service',
-      metadata: {
-        name: serviceName,
+      labels: {
+        'deployment-id': deploymentId,
+        'component': 'workflows'
+      },
+      template: {
         labels: {
           'deployment-id': deploymentId,
           'component': 'workflows'
-        }
-      },
-      spec: {
-        template: {
-          metadata: {
-            annotations: {
-              'autoscaling.knative.dev/minScale': '1',
-              'autoscaling.knative.dev/maxScale': '5',
-              'run.googleapis.com/memory': '2Gi',
-              'run.googleapis.com/cpu': '1'
+        },
+        annotations: {
+          'autoscaling.knative.dev/minScale': '1',
+          'autoscaling.knative.dev/maxScale': '5',
+          'run.googleapis.com/memory': '2Gi',
+          'run.googleapis.com/cpu': '1'
+        },
+        scaling: {
+          minInstanceCount: 1,
+          maxInstanceCount: 5
+        },
+        containers: [{
+          image: 'n8nio/n8n:latest',
+          ports: [{ containerPort: 5678 }],
+          env: [
+            { name: 'N8N_HOST', value: '0.0.0.0' },
+            { name: 'N8N_PORT', value: '5678' },
+            { name: 'N8N_PROTOCOL', value: 'https' },
+            { name: 'WEBHOOK_URL', value: `https://n8n-${deploymentId}-${this.region}-${this.projectId}.a.run.app/` },
+            { name: 'GENERIC_TIMEZONE', value: 'UTC' },
+            { name: 'DB_TYPE', value: 'postgresdb' },
+            { name: 'DB_POSTGRESDB_HOST', value: infrastructure.databaseInstance.host },
+            { name: 'DB_POSTGRESDB_DATABASE', value: 'n8n' },
+            { name: 'DB_POSTGRESDB_USER', value: 'n8n_user' },
+            { name: 'DB_POSTGRESDB_PASSWORD', value: infrastructure.databaseInstance.password },
+            { name: 'N8N_ENCRYPTION_KEY', value: this.generateEncryptionKey() }
+          ],
+          resources: {
+            limits: {
+              cpu: '1',
+              memory: '2Gi'
             }
-          },
-          spec: {
-            containers: [{
-              image: 'n8nio/n8n:latest',
-              ports: [{ containerPort: 5678 }],
-              env: [
-                { name: 'N8N_HOST', value: '0.0.0.0' },
-                { name: 'N8N_PORT', value: '5678' },
-                { name: 'N8N_PROTOCOL', value: 'https' },
-                { name: 'WEBHOOK_URL', value: `https://n8n-${deploymentId}-${this.region}-${this.projectId}.a.run.app/` },
-                { name: 'GENERIC_TIMEZONE', value: 'UTC' },
-                { name: 'DB_TYPE', value: 'postgresdb' },
-                { name: 'DB_POSTGRESDB_HOST', value: infrastructure.databaseInstance.host },
-                { name: 'DB_POSTGRESDB_DATABASE', value: 'n8n' },
-                { name: 'DB_POSTGRESDB_USER', value: 'n8n_user' },
-                { name: 'DB_POSTGRESDB_PASSWORD', value: infrastructure.databaseInstance.password },
-                { name: 'N8N_ENCRYPTION_KEY', value: this.generateEncryptionKey() }
-              ],
-              resources: {
-                limits: {
-                  cpu: '1',
-                  memory: '2Gi'
-                }
-              }
-            }]
           }
-        }
+        }]
       }
     };
     
@@ -434,25 +427,26 @@ class RealGCPDeployment {
     const serviceName = `chat-${deploymentId}`;
     
     const service = {
-      apiVersion: 'serving.knative.dev/v1',
-      kind: 'Service',
-      metadata: {
-        name: serviceName,
+      labels: {
+        'deployment-id': deploymentId,
+        'component': 'chat-interface'
+      },
+      template: {
         labels: {
           'deployment-id': deploymentId,
           'component': 'chat-interface'
-        }
-      },
-      spec: {
-        template: {
-          spec: {
-            containers: [{
-              image: 'python:3.11-slim',
-              ports: [{ containerPort: 8501 }],
-              command: ['/bin/bash', '-c'],
-              args: [`
-                pip install -q streamlit requests &&
-                cat > chat_app.py << 'EOF'
+        },
+        scaling: {
+          minInstanceCount: 1,
+          maxInstanceCount: 3
+        },
+        containers: [{
+          image: 'python:3.11-slim',
+          ports: [{ containerPort: 8501 }],
+          command: ['/bin/bash', '-c'],
+          args: [`
+            pip install -q streamlit requests &&
+            cat > chat_app.py << 'EOF'
 import streamlit as st
 import requests
 import json
@@ -494,11 +488,9 @@ with st.sidebar:
     st.info(f"Industry: ${deploymentConfig.industry}")
     st.success("🟢 All services online")
 EOF
-                streamlit run chat_app.py --server.port=8501 --server.address=0.0.0.0
-              `]
-            }]
-          }
-        }
+            streamlit run chat_app.py --server.port=8501 --server.address=0.0.0.0
+          `]
+        }]
       }
     };
     
