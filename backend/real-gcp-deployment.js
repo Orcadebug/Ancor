@@ -9,6 +9,7 @@ const { GoogleAuth } = require('google-auth-library');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const retry = require('async-retry');
 
 class RealGCPDeployment {
   constructor() {
@@ -80,7 +81,19 @@ class RealGCPDeployment {
 
       this.auth = new GoogleAuth(authOptions);
 
-      const authClient = await this.auth.getClient();
+      // Get auth client with retry mechanism
+      const authClient = await retry(async () => {
+        console.log('🔄 Attempting authentication...');
+        return await this.auth.getClient();
+      }, {
+        retries: 2,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 3000,
+        onRetry: (error, attempt) => {
+          console.log(`⚠️ Auth retry attempt ${attempt}/2:`, error.message);
+        }
+      });
       
       this.storage = new Storage({
         projectId: this.projectId,
@@ -125,17 +138,13 @@ class RealGCPDeployment {
       // Step 3: Deploy n8n workflow engine
       const workflowService = await this.deployN8NWorkflows(deploymentId, industry, infrastructure);
       
-      // Step 4: Deploy document processing service
-      const docService = await this.deployDocumentProcessor(deploymentId, infrastructure);
-      
-      // Step 5: Deploy chat interface
+      // Step 4: Deploy chat interface (document processing removed to eliminate gRPC issues)
       const chatService = await this.deployChatInterface(deploymentId, infrastructure);
       
-      // Step 6: Configure networking and security
+      // Step 5: Configure networking and security
       const networking = await this.configureNetworking(deploymentId, {
         aiService,
         workflowService,
-        docService,
         chatService
       });
       
@@ -162,7 +171,6 @@ class RealGCPDeployment {
         services: {
           llama: aiService.url,
           n8n: workflowService.url,
-          documents: docService.url,
           chat: chatService.url
         },
         infrastructure: {
@@ -288,10 +296,24 @@ class RealGCPDeployment {
     };
     
     const parent = `projects/${this.projectId}/locations/${this.region}`;
-    const [operation] = await this.cloudRun.createService({
-      parent,
-      service,
-      serviceId: serviceName
+    
+    // Create service with retry mechanism to handle gRPC auth issues
+    const operation = await retry(async () => {
+      console.log('🔄 Attempting Cloud Run service creation...');
+      const [op] = await this.cloudRun.createService({
+        parent,
+        service,
+        serviceId: serviceName
+      });
+      return op;
+    }, {
+      retries: 3,
+      factor: 2,
+      minTimeout: 1000,
+      maxTimeout: 5000,
+      onRetry: (error, attempt) => {
+        console.log(`⚠️ Retry attempt ${attempt}/3 for service creation:`, error.message);
+      }
     });
     
     console.log('⏳ Waiting for LLaMA model deployment...');
@@ -367,10 +389,24 @@ class RealGCPDeployment {
     };
     
     const parent = `projects/${this.projectId}/locations/${this.region}`;
-    const [operation] = await this.cloudRun.createService({
-      parent,
-      service,
-      serviceId: serviceName
+    
+    // Create n8n service with retry mechanism to handle gRPC auth issues
+    const operation = await retry(async () => {
+      console.log('🔄 Attempting n8n service creation...');
+      const [op] = await this.cloudRun.createService({
+        parent,
+        service,
+        serviceId: serviceName
+      });
+      return op;
+    }, {
+      retries: 3,
+      factor: 2,
+      minTimeout: 1000,
+      maxTimeout: 5000,
+      onRetry: (error, attempt) => {
+        console.log(`⚠️ Retry attempt ${attempt}/3 for n8n service creation:`, error.message);
+      }
     });
     
     const [result] = await operation.promise();
@@ -388,86 +424,6 @@ class RealGCPDeployment {
     };
   }
 
-  /**
-   * Deploy document processing service
-   */
-  async deployDocumentProcessor(deploymentId, infrastructure) {
-    console.log('📄 Deploying document processing service...');
-    
-    const serviceName = `docs-${deploymentId}`;
-    
-    const service = {
-      apiVersion: 'serving.knative.dev/v1',
-      kind: 'Service',
-      metadata: {
-        name: serviceName,
-        labels: {
-          'deployment-id': deploymentId,
-          'component': 'document-processor'
-        }
-      },
-      spec: {
-        template: {
-          spec: {
-            containers: [{
-              image: 'gcr.io/deeplearning-platform-release/base-cpu:latest',
-              ports: [{ containerPort: 8080 }],
-              env: [
-                { name: 'STORAGE_BUCKET', value: infrastructure.bucketName },
-                { name: 'DATABASE_URL', value: infrastructure.databaseInstance.connectionString }
-              ],
-              command: ['/bin/bash', '-c'],
-              args: [`
-                pip install -q unstructured[all-docs] chromadb sentence-transformers &&
-                cat > app.py << 'EOF'
-import os
-from flask import Flask, request, jsonify
-from unstructured.partition.auto import partition
-from chromadb import Client
-import chromadb.config
-from sentence_transformers import SentenceTransformer
-
-app = Flask(__name__)
-model = SentenceTransformer('all-MiniLM-L6-v2')
-chroma_client = Client()
-
-@app.route('/health')
-def health():
-    return {'status': 'healthy'}
-
-@app.route('/process', methods=['POST'])
-def process_document():
-    # Document processing logic here
-    return {'status': 'processed'}
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
-EOF
-                python app.py
-              `]
-            }]
-          }
-        }
-      }
-    };
-    
-    const parent = `projects/${this.projectId}/locations/${this.region}`;
-    const [operation] = await this.cloudRun.createService({
-      parent,
-      service,
-      serviceId: serviceName
-    });
-    
-    const [result] = await operation.promise();
-    await this.makeServicePublic(serviceName);
-    
-    console.log('✅ Document processor deployed');
-    
-    return {
-      name: serviceName,
-      url: result.status.url
-    };
-  }
 
   /**
    * Deploy chat interface (Streamlit-based)
@@ -547,10 +503,24 @@ EOF
     };
     
     const parent = `projects/${this.projectId}/locations/${this.region}`;
-    const [operation] = await this.cloudRun.createService({
-      parent,
-      service,
-      serviceId: serviceName
+    
+    // Create chat interface service with retry mechanism to handle gRPC auth issues
+    const operation = await retry(async () => {
+      console.log('🔄 Attempting chat interface service creation...');
+      const [op] = await this.cloudRun.createService({
+        parent,
+        service,
+        serviceId: serviceName
+      });
+      return op;
+    }, {
+      retries: 3,
+      factor: 2,
+      minTimeout: 1000,
+      maxTimeout: 5000,
+      onRetry: (error, attempt) => {
+        console.log(`⚠️ Retry attempt ${attempt}/3 for chat interface service creation:`, error.message);
+      }
     });
     
     const [result] = await operation.promise();
@@ -580,8 +550,7 @@ EOF
       routes: {
         '/': services.chatService.url,
         '/chat': services.aiService.url,
-        '/workflows': services.workflowService.url,
-        '/documents': services.docService.url
+        '/workflows': services.workflowService.url
       }
     };
   }

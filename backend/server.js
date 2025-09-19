@@ -219,27 +219,14 @@ app.get('/api/dashboard/stats/:orgId', authenticateSupabaseUser, async (req, res
       });
     }
     
-    // Get documents for the authenticated user's deployments
-    const { data: userDocuments, error: documentsError } = await supabase
-      .from('documents')
-      .select('*, deployments!inner(organization_id)')
-      .eq('deployments.organization_id', req.params.orgId);
-    
-    if (documentsError) {
-      console.error('Error fetching documents:', documentsError);
-      // Don't fail if documents table doesn't exist yet
-      console.warn('Documents table might not exist yet, continuing...');
-    }
-    
     const activeCount = userDeployments?.filter(d => d.status === 'active').length || 0;
     const totalCost = userDeployments?.reduce((sum, d) => sum + (d.monthly_cost || 0), 0) || 0;
-    const docCount = userDocuments?.length || 0;
     
-    console.log(`📊 Stats: ${activeCount} active deployments, ${docCount} documents, $${totalCost} cost`);
+    console.log(`📊 Stats: ${activeCount} active deployments, $${totalCost} cost`);
     
     res.json({
       activeDeployments: activeCount,
-      documentsProcessed: docCount,
+      documentsProcessed: 0, // Documents feature disabled temporarily
       monthlyCost: totalCost,
       successRate: 98.5
     });
@@ -608,90 +595,26 @@ app.delete('/api/deployments/:id', authenticateSupabaseUser, async (req, res) =>
   }
 });
 
-// Upload document (REAL AZURE STORAGE)
-app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
-  try {
-    const file = req.file;
-    const deploymentId = req.body.deploymentId || 'demo-deployment';
-    
-    console.log('📄 Uploading document to Azure:', file.originalname);
-    
-    // Upload to GCP Cloud Storage
-    const uploadResult = await gcpService.uploadDocument(deploymentId, file);
-    
-    // Extract text (simple implementation)
-    let extractedText = '';
-    if (file.mimetype === 'text/plain') {
-      extractedText = file.buffer.toString();
-    } else {
-      extractedText = `Content from ${file.originalname}: This document contains important information that can be analyzed by AI.`;
-    }
-    
-    // Process with AI (GCP)
-    // Note: AI processing will be handled by the deployed Cloud Run service
-    const aiResult = { 
-      summary: 'Document uploaded successfully to GCP Cloud Storage',
-      status: 'uploaded',
-      processingUrl: uploadResult.url
-    };
-    
-    // Store document record
-    const document = {
-      id: uploadResult.blobName,
-      deploymentId,
-      name: file.originalname,
-      type: file.mimetype,
-      size: file.size,
-      status: 'processed',
-      url: uploadResult.url,
-      summary: aiResult.summary,
-      extractedText,
-      created_at: new Date().toISOString()
-    };
-    
-    documents.set(document.id, document);
-    
-    res.json({
-      success: true,
-      document,
-      message: 'Document uploaded and processed with real AI!'
-    });
-    
-  } catch (error) {
-    console.error('❌ Document upload failed:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to upload document'
-    });
-  }
-});
+// Document upload functionality temporarily disabled to fix gRPC deployment issues
+// app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
+//   res.status(503).json({
+//     success: false,
+//     error: 'Document upload temporarily disabled during infrastructure updates'
+//   });
+// });
 
-// Get documents for organization
-app.get('/api/documents/organization/:orgId', (req, res) => {
-  console.log('📄 Documents requested for org:', req.params.orgId);
-  
-  const orgDocuments = Array.from(documents.values());
-  
-  res.json({
-    documents: orgDocuments
-  });
-});
+// app.get('/api/documents/organization/:orgId', (req, res) => {
+//   res.json({
+//     documents: []
+//   });
+// });
 
 // Chat with AI (REAL AI RESPONSES)
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, deploymentId, documentId } = req.body;
+    const { message, deploymentId } = req.body;
     
     console.log('💬 Real AI chat request:', message);
-    
-    // Get document context if provided
-    let context = '';
-    if (documentId) {
-      const document = documents.get(documentId);
-      if (document) {
-        context = document.extractedText || '';
-      }
-    }
     
     // Get AI response from GCP Cloud Run service
     // Note: In production, this would call the deployed AI service

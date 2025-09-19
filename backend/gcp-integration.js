@@ -8,6 +8,7 @@ const { ServicesClient } = require('@google-cloud/run');
 const { GoogleAuth } = require('google-auth-library');
 const fs = require('fs');
 const path = require('path');
+const retry = require('async-retry');
 
 class GCPService {
   constructor() {
@@ -419,10 +420,23 @@ class GCPService {
     const parent = `projects/${this.projectId}/locations/${this.region}`;
     
     try {
-      const [operation] = await this.cloudRun.createService({
-        parent,
-        service,
-        serviceId: serviceName
+      // Create service with retry mechanism to handle gRPC auth issues
+      const operation = await retry(async () => {
+        console.log('🔄 Attempting Cloud Run service creation...');
+        const [op] = await this.cloudRun.createService({
+          parent,
+          service,
+          serviceId: serviceName
+        });
+        return op;
+      }, {
+        retries: 3,
+        factor: 2,
+        minTimeout: 1000,
+        maxTimeout: 5000,
+        onRetry: (error, attempt) => {
+          console.log(`⚠️ Retry attempt ${attempt}/3 for service creation:`, error.message);
+        }
       });
       
       // Wait for deployment to complete
