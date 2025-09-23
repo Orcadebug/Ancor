@@ -4,7 +4,7 @@
  */
 
 const { Storage } = require('@google-cloud/storage');
-const { ServicesClient } = require('@google-cloud/run');
+const { ServicesClient } = require('@google-cloud/run').v2;
 const { GoogleAuth } = require('google-auth-library');
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -248,11 +248,6 @@ class RealGCPDeployment {
         'component': 'ai-model',
         'model': modelSize
       },
-      annotations: {
-        'run.googleapis.com/execution-environment': 'gen2',
-        'run.googleapis.com/cpu-throttling': 'false',
-        'run.googleapis.com/startup-cpu-boost': 'true'
-      },
       template: {
         labels: {
           'deployment-id': deploymentId,
@@ -260,15 +255,15 @@ class RealGCPDeployment {
         },
         annotations: {
           'autoscaling.knative.dev/minScale': '1',
-          'autoscaling.knative.dev/maxScale': '10',
-          'run.googleapis.com/memory': '32Gi',
-          'run.googleapis.com/cpu': '8',
-          'run.googleapis.com/timeout': '3600s'
+          'autoscaling.knative.dev/maxScale': '10'
         },
         scaling: {
           minInstanceCount: 1,
           maxInstanceCount: 10
         },
+        // Use Cloud Run v2 API fields instead of annotations
+        executionEnvironment: 'EXECUTION_ENVIRONMENT_GEN2',
+        timeout: '3600s',
         containers: [{
           image: containerImage,
           ports: [{ containerPort: 8000 }],
@@ -285,6 +280,19 @@ class RealGCPDeployment {
               'nvidia.com/gpu': '1', // Request GPU
               cpu: '8',
               memory: '32Gi'
+            },
+            requests: {
+              cpu: '8',
+              memory: '32Gi'
+            }
+          },
+          // Use Cloud Run v2 startup and performance settings
+          startupProbe: {
+            timeoutSeconds: 240,
+            periodSeconds: 240,
+            failureThreshold: 1,
+            tcpSocket: {
+              port: 8000
             }
           }
         }]
@@ -347,9 +355,7 @@ class RealGCPDeployment {
         },
         annotations: {
           'autoscaling.knative.dev/minScale': '1',
-          'autoscaling.knative.dev/maxScale': '5',
-          'run.googleapis.com/memory': '2Gi',
-          'run.googleapis.com/cpu': '1'
+          'autoscaling.knative.dev/maxScale': '5'
         },
         scaling: {
           minInstanceCount: 1,
@@ -373,6 +379,10 @@ class RealGCPDeployment {
           ],
           resources: {
             limits: {
+              cpu: '1',
+              memory: '2Gi'
+            },
+            requests: {
               cpu: '1',
               memory: '2Gi'
             }
