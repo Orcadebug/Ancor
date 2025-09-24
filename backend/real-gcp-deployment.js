@@ -139,7 +139,7 @@ class RealGCPDeployment {
       const workflowService = await this.deployN8NWorkflows(deploymentId, industry, infrastructure);
       
       // Step 4: Deploy chat interface (document processing removed to eliminate gRPC issues)
-      const chatService = await this.deployChatInterface(deploymentId, infrastructure);
+      const chatService = await this.deployChatInterface(deploymentId, infrastructure, industry, aiService);
       
       // Step 5: Configure networking and security
       const networking = await this.configureNetworking(deploymentId, {
@@ -263,7 +263,7 @@ class RealGCPDeployment {
         },
         // Use Cloud Run v2 API fields instead of annotations
         executionEnvironment: 'EXECUTION_ENVIRONMENT_GEN2',
-        timeout: '3600s',
+        timeout: { seconds: 3600 },
         containers: [{
           image: containerImage,
           ports: [{ containerPort: 8000 }],
@@ -431,7 +431,7 @@ class RealGCPDeployment {
   /**
    * Deploy chat interface (Streamlit-based)
    */
-  async deployChatInterface(deploymentId, infrastructure) {
+  async deployChatInterface(deploymentId, infrastructure, industry, aiService) {
     console.log('💬 Deploying chat interface...');
     
     const serviceName = `chat-${deploymentId}`;
@@ -464,7 +464,7 @@ import json
 st.set_page_config(page_title="Private AI Assistant", page_icon="🤖")
 
 st.title("🤖 Private AI Assistant")
-st.markdown("### Secure, Self-Hosted AI for ${deploymentConfig.industry}")
+st.markdown("### Secure, Self-Hosted AI for ${industry}")
 
 # Chat interface
 if "messages" not in st.session_state:
@@ -481,7 +481,7 @@ if prompt := st.chat_input("Ask your AI assistant..."):
     
     with st.chat_message("assistant"):
         # Call LLaMA service
-        response = requests.post("${infrastructure.llamaServiceUrl}/chat", 
+        response = requests.post("${aiService.url}/chat", 
                                json={"message": prompt})
         if response.status_code == 200:
             ai_response = response.json()["response"]
@@ -495,7 +495,7 @@ with st.sidebar:
     st.markdown("### Deployment Info")
     st.info(f"Deployment ID: ${deploymentId}")
     st.info(f"Model: LLaMA 3 70B")
-    st.info(f"Industry: ${deploymentConfig.industry}")
+    st.info(f"Industry: ${industry}")
     st.success("🟢 All services online")
 EOF
             streamlit run chat_app.py --server.port=8501 --server.address=0.0.0.0
