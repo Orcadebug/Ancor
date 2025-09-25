@@ -255,7 +255,8 @@ class RealGCPDeployment {
         },
         annotations: {
           'autoscaling.knative.dev/minScale': '1',
-          'autoscaling.knative.dev/maxScale': '10'
+          'autoscaling.knative.dev/maxScale': '10',
+          'run.googleapis.com/gpu-no-zonal-redundancy': 'true'
         },
         scaling: {
           minInstanceCount: 1,
