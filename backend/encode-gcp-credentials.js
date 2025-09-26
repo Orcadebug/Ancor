@@ -6,8 +6,8 @@
 
 const fs = require('fs');
 
-// Read the original JSON file
-const keyFile = 'ai-infrastructure-platform-881847c349a2.json';
+// Read the original JSON file - UPDATE THIS TO YOUR NEW KEY FILE
+const keyFile = 'ai-infrastructure-platform-ab0d21dc8cd2.json';
 
 if (!fs.existsSync(keyFile)) {
   console.log('❌ Key file not found. Please place your GCP service account key file in this directory.');

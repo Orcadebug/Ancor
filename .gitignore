@@ -206,4 +206,7 @@ keys/
 # Deployment artifacts
 deploy/
 deployment/
-!DEPLOYMENT.md
+!DEPLOYMENT.md# Temporary credential files
+backend/encoded*.txt
+backend/decoded*.json
+encoded*.txt

@@ -257,12 +257,13 @@ class RealGCPDeployment {
           'autoscaling.knative.dev/minScale': '1',
           'autoscaling.knative.dev/maxScale': '3',
           'run.googleapis.com/cpu-throttling': 'false',
-          'run.googleapis.com/gpu-zonal-redundancy-disabled': 'true',
           'run.googleapis.com/accelerator': 'nvidia-l4'
         },
         scaling: {
           minInstanceCount: 1,
-          maxInstanceCount: 3
+          maxInstanceCount: 3,
+          // Disable GPU zonal redundancy to avoid quota issues
+          redundancyMode: 'REDUNDANCY_MODE_DISABLED'
         },
         // Use Cloud Run v2 API fields instead of annotations
         executionEnvironment: 'EXECUTION_ENVIRONMENT_GEN2',
