@@ -255,15 +255,14 @@ class RealGCPDeployment {
         },
         annotations: {
           'autoscaling.knative.dev/minScale': '1',
-          'autoscaling.knative.dev/maxScale': '3',
-          'run.googleapis.com/cpu-throttling': 'false',
-          'run.googleapis.com/accelerator': 'nvidia-l4'
+          'autoscaling.knative.dev/maxScale': '1',  // Reduced to 1 to avoid quota issues
+          'run.googleapis.com/cpu-throttling': 'false'
+          // Temporarily removing GPU to test deployment
+          // 'run.googleapis.com/accelerator': 'nvidia-l4'
         },
         scaling: {
           minInstanceCount: 1,
-          maxInstanceCount: 3,
-          // Disable GPU zonal redundancy to avoid quota issues
-          redundancyMode: 'REDUNDANCY_MODE_DISABLED'
+          maxInstanceCount: 1  // Single instance to avoid any quota issues
         },
         // Use Cloud Run v2 API fields instead of annotations
         executionEnvironment: 'EXECUTION_ENVIRONMENT_GEN2',
@@ -281,13 +280,14 @@ class RealGCPDeployment {
           ],
           resources: {
             limits: {
-              'nvidia.com/gpu': '1',
-              cpu: '4',
-              memory: '16Gi'
+              // Temporarily removing GPU requirement
+              // 'nvidia.com/gpu': '1',
+              cpu: '8',
+              memory: '32Gi'
             },
             requests: {
-              cpu: '4',
-              memory: '16Gi'
+              cpu: '8',
+              memory: '32Gi'
             }
           },
           // Use Cloud Run v2 startup and performance settings
