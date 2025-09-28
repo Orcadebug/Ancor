@@ -354,7 +354,6 @@ EOF
             python ai_server.py
           `],
           env: [
-            { name: 'PORT', value: '8000' },
             { name: 'MODEL_NAME', value: modelSize },
             { name: 'DEPLOYMENT_ID', value: deploymentId },
             { name: 'STORAGE_BUCKET', value: infrastructure.bucketName }
