@@ -460,30 +460,51 @@ EOF
           maxInstanceCount: 5
         },
         containers: [{
-          image: 'n8nio/n8n:latest',
-          ports: [{ containerPort: 5678 }],
+          image: 'node:18-alpine',
+          ports: [{ 
+            containerPort: 8080,
+            name: 'http1'
+          }],
+          command: ['/bin/sh', '-c'],
+          args: [`
+            apk add --no-cache python3 py3-pip &&
+            npm install -g n8n@latest &&
+            # Use Cloud Run's PORT environment variable for n8n
+            export N8N_PORT=\${PORT:-8080} &&
+            export N8N_HOST=0.0.0.0 &&
+            export N8N_PROTOCOL=https &&
+            export WEBHOOK_URL=https://n8n-${deploymentId}-${this.region}-${this.projectId}.a.run.app/ &&
+            export GENERIC_TIMEZONE=UTC &&
+            echo "Starting n8n on port \$N8N_PORT" &&
+            n8n start
+          `],
           env: [
-            { name: 'N8N_HOST', value: '0.0.0.0' },
-            { name: 'N8N_PORT', value: '5678' },
-            { name: 'N8N_PROTOCOL', value: 'https' },
-            { name: 'WEBHOOK_URL', value: `https://n8n-${deploymentId}-${this.region}-${this.projectId}.a.run.app/` },
-            { name: 'GENERIC_TIMEZONE', value: 'UTC' },
-            { name: 'DB_TYPE', value: 'postgresdb' },
-            { name: 'DB_POSTGRESDB_HOST', value: infrastructure.databaseInstance.host },
-            { name: 'DB_POSTGRESDB_DATABASE', value: 'n8n' },
-            { name: 'DB_POSTGRESDB_USER', value: 'n8n_user' },
-            { name: 'DB_POSTGRESDB_PASSWORD', value: infrastructure.databaseInstance.password },
-            { name: 'N8N_ENCRYPTION_KEY', value: this.generateEncryptionKey() }
+            { name: 'N8N_ENCRYPTION_KEY', value: this.generateEncryptionKey() },
+            { name: 'N8N_USER_MANAGEMENT_DISABLED', value: 'true' },
+            { name: 'N8N_BASIC_AUTH_ACTIVE', value: 'true' },
+            { name: 'N8N_BASIC_AUTH_USER', value: 'admin' },
+            { name: 'N8N_BASIC_AUTH_PASSWORD', value: this.generateSecurePassword() }
           ],
           resources: {
             limits: {
-              cpu: '1',
-              memory: '2Gi'
+              cpu: '2',
+              memory: '4Gi'
             },
             requests: {
-              cpu: '1',
-              memory: '2Gi'
+              cpu: '2',
+              memory: '4Gi'
             }
+          },
+          // Startup probe for n8n installation and startup
+          startupProbe: {
+            httpGet: {
+              path: '/',
+              port: 8080
+            },
+            initialDelaySeconds: 120,
+            timeoutSeconds: 10,
+            periodSeconds: 30,
+            failureThreshold: 10  // Allow up to 5 minutes for n8n startup
           }
         }]
       }
@@ -562,7 +583,10 @@ EOF
         },
         containers: [{
           image: 'python:3.11-slim',
-          ports: [{ containerPort: 8501 }],
+          ports: [{ 
+            containerPort: 8080,
+            name: 'http1'
+          }],
           command: ['/bin/bash', '-c'],
           args: [`
             pip install -q streamlit requests &&
@@ -608,7 +632,8 @@ with st.sidebar:
     st.info(f"Industry: ${industry}")
     st.success("🟢 All services online")
 EOF
-            streamlit run chat_app.py --server.port=8501 --server.address=0.0.0.0
+            # Use Cloud Run's PORT environment variable
+            streamlit run chat_app.py --server.port=\${PORT:-8080} --server.address=0.0.0.0
           `]
         }]
       }
