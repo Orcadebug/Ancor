@@ -412,11 +412,23 @@ EOF
     // Make service publicly accessible
     await this.makeServicePublic(serviceName);
     
-    console.log(`✅ ${modelSize} deployed successfully`);
+    // Extract URL from Cloud Run v2 API response with fallback
+    let serviceUrl = null;
+    if (result && result.status && result.status.url) {
+      serviceUrl = result.status.url;
+    } else if (result && result.uri) {
+      serviceUrl = result.uri;
+    } else {
+      // Construct URL manually as fallback
+      serviceUrl = `https://${serviceName}-${this.region.replace('_', '-')}-${this.projectId}.a.run.app`;
+      console.log(`⚠️ Could not extract URL from result, using constructed URL: ${serviceUrl}`);
+    }
+    
+    console.log(`✅ ${modelSize} deployed successfully at ${serviceUrl}`);
     
     return {
       name: serviceName,
-      url: result.status.url,
+      url: serviceUrl,
       model: modelSize
     };
   }
@@ -501,14 +513,26 @@ EOF
     const [result] = await operation.promise();
     await this.makeServicePublic(serviceName);
     
+    // Extract URL from Cloud Run v2 API response with fallback
+    let serviceUrl = null;
+    if (result && result.status && result.status.url) {
+      serviceUrl = result.status.url;
+    } else if (result && result.uri) {
+      serviceUrl = result.uri;
+    } else {
+      // Construct URL manually as fallback
+      serviceUrl = `https://${serviceName}-${this.region.replace('_', '-')}-${this.projectId}.a.run.app`;
+      console.log(`⚠️ Could not extract n8n URL from result, using constructed URL: ${serviceUrl}`);
+    }
+    
     // Install industry-specific workflows
     await this.installIndustryWorkflows(serviceName, industry);
     
-    console.log('✅ n8n workflow engine deployed');
+    console.log(`✅ n8n workflow engine deployed at ${serviceUrl}`);
     
     return {
       name: serviceName,
-      url: result.status.url,
+      url: serviceUrl,
       industry: industry
     };
   }
@@ -614,11 +638,23 @@ EOF
     const [result] = await operation.promise();
     await this.makeServicePublic(serviceName);
     
-    console.log('✅ Chat interface deployed');
+    // Extract URL from Cloud Run v2 API response with fallback
+    let serviceUrl = null;
+    if (result && result.status && result.status.url) {
+      serviceUrl = result.status.url;
+    } else if (result && result.uri) {
+      serviceUrl = result.uri;
+    } else {
+      // Construct URL manually as fallback
+      serviceUrl = `https://${serviceName}-${this.region.replace('_', '-')}-${this.projectId}.a.run.app`;
+      console.log(`⚠️ Could not extract chat URL from result, using constructed URL: ${serviceUrl}`);
+    }
+    
+    console.log(`✅ Chat interface deployed at ${serviceUrl}`);
     
     return {
       name: serviceName,
-      url: result.status.url
+      url: serviceUrl
     };
   }
 
